@@ -14,6 +14,13 @@
 #define LED_GPIO        GPIOA
 #define LED_PIN         GPIO_PIN_5
 
+// 按键定义 (进入 Bootloader 模式)
+// 默认配置为 PC13, 上拉输入, 低电平有效 (按下时接地)
+// 如果是 Nucleo 开发板自带按键 (B1), 通常为 Active High (按下为高电平), 请修改 BUTTON_PRESSED_STATE 为 GPIO_PIN_SET 并将 Pull 改为 GPIO_PULLDOWN
+#define BOOT_BUTTON_GPIO_PORT GPIOC
+#define BOOT_BUTTON_PIN       GPIO_PIN_13
+#define BUTTON_PRESSED_STATE  GPIO_PIN_RESET // 低电平有效
+
 // -------------------------------------------------------------------------
 
 typedef void (*pFunction)(void);
@@ -37,7 +44,7 @@ void JumpToApplication(void)
     // 检查 App 的第一个字 (MSP) 是否在 SRAM 范围内
     if (((*(__IO uint32_t*)APP_ADDRESS) & 0x2FF00000) == 0x20000000)
     {
-        // 2. 关闭所有中断
+        // 2. 关闭所有中断 (非常重要！否则跳转后 App 收到中断会跑飞)
         __disable_irq();
         
         // 3. 关闭外设时钟 / DeInit 外设
@@ -56,7 +63,9 @@ void JumpToApplication(void)
 
         // 5. 设置主堆栈指针 (MSP)
         __set_MSP(*(__IO uint32_t*)APP_ADDRESS);
-
+        
+        // 重定向中断向量表 (SCB->VTOR) 到 App 起始地址
+        SCB->VTOR = APP_ADDRESS;
         // 6. 跳转执行 App
         JumpToApplicationFn();
     }
@@ -86,7 +95,20 @@ int main(void)
     HAL_GPIO_WritePin(LED_GPIO, LED_PIN, GPIO_PIN_RESET);
     HAL_Delay(200);
 
-    // 3. 执行 Bootloader 流程
+    // 3. 检测按键，决定是否进入 Loader 模式
+    // 如果按住按键 (PC13)，则停留在 Bootloader，不跳转
+    if (HAL_GPIO_ReadPin(BOOT_BUTTON_GPIO_PORT, BOOT_BUTTON_PIN) == BUTTON_PRESSED_STATE)
+    {
+        // 进入 Bootloader 保持模式 (这里可以添加 USB/UART 升级逻辑)
+        // 目前仅闪烁 LED 指示
+        while (1)
+        {
+            HAL_GPIO_TogglePin(LED_GPIO, LED_PIN);
+            HAL_Delay(100); // 快速闪烁 (10Hz) 表示 Loader 模式
+        }
+    }
+
+    // 4. 执行 Bootloader 流程
     // 在标准 Flash 运行模式下，Bootloader 不需要拷贝代码或初始化 App 的变量。
     // App 的启动文件 (Startup code) 会自动处理 .data 和 .bss 的初始化。
     // Bootloader 只需负责校验和跳转。
@@ -151,7 +173,6 @@ static void MX_GPIO_Init(void)
 
     /* GPIO Ports Clock Enable */
     __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_GPIOH_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
@@ -164,6 +185,12 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(LED_GPIO, &GPIO_InitStruct);
+
+    /*Configure GPIO pin : BOOT_BUTTON_PIN */
+    GPIO_InitStruct.Pin = BOOT_BUTTON_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP; // 上拉 (配合 Active Low)
+    HAL_GPIO_Init(BOOT_BUTTON_GPIO_PORT, &GPIO_InitStruct);
 }
 
 void Error_Handler(void)
