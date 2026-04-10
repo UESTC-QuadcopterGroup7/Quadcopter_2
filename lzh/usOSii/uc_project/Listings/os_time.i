@@ -263,6 +263,15 @@
 
 
 
+ 
+
+
+
+
+
+
+
+
 
 
 
@@ -2492,8 +2501,8 @@ INT8U  OSTimeDlyHMSM (INT8U   hours,
 
                                                   
                                                   
-    ticks = ((INT32U)hours * 3600uL + (INT32U)minutes * 60uL + (INT32U)seconds) * 100u
-          + 100u * ((INT32U)ms + 500uL / 100u) / 1000uL;
+    ticks = ((INT32U)hours * 3600uL + (INT32U)minutes * 60uL + (INT32U)seconds) * 1000u
+          + 1000u * ((INT32U)ms + 500uL / 1000u) / 1000uL;
     OSTimeDly(ticks);
     return (0u);
 }

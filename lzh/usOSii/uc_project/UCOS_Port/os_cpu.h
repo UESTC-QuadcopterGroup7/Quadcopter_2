@@ -47,6 +47,15 @@
 #define  OS_CPU_EXT  extern
 #endif
 
+/*
+*********************************************************************************************************
+*                                              Cortex-M4
+*                                      Floating Point Unit (FPU)
+*********************************************************************************************************
+*/
+
+#define  OS_CPU_ARM_FP_EN          1u            /* 1 = FPU Present, 0 = FPU Not Present               */
+
 #ifndef  OS_CPU_EXCEPT_STK_SIZE
 #define  OS_CPU_EXCEPT_STK_SIZE    128u          /* Default exception stack size is 128 OS_STK entries */
 #endif

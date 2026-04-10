@@ -260,6 +260,15 @@
 
 
 
+ 
+
+
+
+
+
+
+
+
 
 
 
@@ -2463,7 +2472,7 @@ INT16U  const  OSTaskRegTblSize      = 1u;
 
 INT16U  const  OSTCBPrioTblMax       = 63u + 1u;      
 INT16U  const  OSTCBSize             = sizeof(OS_TCB);           
-INT16U  const  OSTicksPerSec         = 100u;
+INT16U  const  OSTicksPerSec         = 1000u;
 INT16U  const  OSTimeTickHookEn      = 1u;
 INT16U  const  OSVersionNbr          = 29300u;
 

@@ -1,17 +1,13 @@
 #include <string.h>
 #include "main.h"
-#include "GPIO_Set.h"
-#include "OLED.h"
-#include "BLDC.h"
-#include "Receive_IC.h"
-#include "GY86.h"
-// #include "PWM_Set.h"
-#include "UART_Set.h"
-#include "ReadPeripherals.h"
+#include "ucos_ii.h"
 
-TIM_HandleTypeDef htim3;
-UART_HandleTypeDef huart1;
-uint16_t PWM_IN_Wid[4];
+#define  APP_TASK_START_STK_SIZE                    128u
+#define  APP_TASK_START_PRIO                        2u
+
+static  OS_STK  AppTaskStartStk[APP_TASK_START_STK_SIZE];
+
+static  void  AppTaskStart (void *p_arg);
 
 // HAL库时钟配置函数
 void SystemClock_Config(void)
@@ -58,24 +54,47 @@ int main(void)
 {
     HAL_Init();
     SystemClock_Config();
-    OLED_Init();
+	
+    OSInit();                                                   /* 初始化 uC/OS-II                                      */
 
-    IC_Init();
-    BLDC_Init();
+    OSTaskCreate(AppTaskStart,                                  /* 创建起始任务                                         */
+                 (void *)0,
+                 &AppTaskStartStk[APP_TASK_START_STK_SIZE - 1],
+                 APP_TASK_START_PRIO);
 
-    ReadPeripherals_Init();
-    UART1_FULL_INIT(9600);
-    // Calibrate_BLDC();
-    // OLED_ShowString(1, 1, "BLDC Calibrated");
-    
+    OSStart();                                                  /* 开始多任务调度                                       */
+
     while (1)
     {
-        // OLED_ShowNum(2, 1, PWM_IN_Wid[2], 4);
-        // BLDC_SetThrottle_us(1500, 3);
-        ReadPeripherals_Process();
-        HAL_Delay(5);
+
     }
 }
+
+static  void  AppTaskStart (void *p_arg)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    (void)p_arg;
+
+    OS_CPU_SysTickInit(HAL_RCC_GetHCLKFreq() / OS_TICKS_PER_SEC); /* 初始化 SysTick                                     */
+
+    /* 初始化 PA5 */
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);                  /* 翻转 PA5                                             */
+        OSTimeDly(500);
+        // HAL_Delay(500);
+        // OSTimeDlyHMSM(0, 0, 0, 500);                            /* 延时 500ms                                           */
+    }
+}
+
 
 void Error_Handler(void)
 {

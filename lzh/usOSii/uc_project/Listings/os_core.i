@@ -263,6 +263,15 @@
 
 
 
+ 
+
+
+
+
+
+
+
+
 
 
 
@@ -3230,7 +3239,7 @@ void  OSStatInit (void)
     {cpu_sr = OS_CPU_SR_Save();};
     OSIdleCtr    = 0uL;                           
     {OS_CPU_SR_Restore(cpu_sr);};
-    OSTimeDly(100u / 10u);            
+    OSTimeDly(1000u / 10u);            
     {cpu_sr = OS_CPU_SR_Save();};
     OSIdleCtrMax = OSIdleCtr;                     
     OSStatRdy    = 1u;
@@ -4123,7 +4132,7 @@ void  OS_TaskStat (void *p_arg)
 
     p_arg = p_arg;                                
     while (OSStatRdy == 0u) {
-        OSTimeDly(2u * 100u / 10u);   
+        OSTimeDly(2u * 1000u / 10u);   
     }
     OSIdleCtrMax /= 100uL;
     if (OSIdleCtrMax == 0uL) {
@@ -4146,7 +4155,7 @@ void  OS_TaskStat (void *p_arg)
         OSIdleCtr = 0uL;                         
         {OS_CPU_SR_Restore(cpu_sr);};
 
-        OSTimeDly(100u / 10u);        
+        OSTimeDly(1000u / 10u);        
 
         {cpu_sr = OS_CPU_SR_Save();};
         OSIdleCtrRun = OSIdleCtr;                 

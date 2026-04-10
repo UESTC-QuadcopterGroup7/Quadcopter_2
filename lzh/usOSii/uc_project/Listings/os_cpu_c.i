@@ -274,6 +274,15 @@
 
 
 
+ 
+
+
+
+
+
+
+
+
 
 
 
@@ -2460,7 +2469,7 @@ void  OSInitHookBegin (void)
     INT32U   size;
     OS_STK  *pstk;
 
-
+    INT32U   reg_val;
 
                                                                  
     pstk = &OS_CPU_ExceptStk[0];
@@ -2474,7 +2483,14 @@ void  OSInitHookBegin (void)
     OS_CPU_ExceptStkBase = (OS_STK *)&OS_CPU_ExceptStk[128u];
     OS_CPU_ExceptStkBase = (OS_STK *)((OS_STK)(OS_CPU_ExceptStkBase) & 0xFFFFFFF8);
 
-#line 142 "UCOS_Port\\os_cpu_c.c"
+
+    reg_val = (*((volatile INT32U *)0xE000EF34uL));                                
+    if ((reg_val & 0xC0000000uL) != 0xC0000000uL) {
+        while (1u) {                                             
+            ;
+        }
+    }
+
 
 
 
@@ -2813,7 +2829,27 @@ OS_STK  *OSTaskStkInit (void    (*task)(void *p_arg),
                                                                  
     p_stk      = (OS_STK *)((OS_STK)(p_stk) & 0xFFFFFFF8u);
                                                                  
-#line 501 "UCOS_Port\\os_cpu_c.c"
+
+     --p_stk;
+    *(--p_stk) = (OS_STK)0x02000000u;                            
+                                                                 
+    *(--p_stk) = (OS_STK)0x41700000u;                            
+    *(--p_stk) = (OS_STK)0x41600000u;                            
+    *(--p_stk) = (OS_STK)0x41500000u;                            
+    *(--p_stk) = (OS_STK)0x41400000u;                            
+    *(--p_stk) = (OS_STK)0x41300000u;                            
+    *(--p_stk) = (OS_STK)0x41200000u;                            
+    *(--p_stk) = (OS_STK)0x41100000u;                            
+    *(--p_stk) = (OS_STK)0x41000000u;                            
+    *(--p_stk) = (OS_STK)0x40E00000u;                            
+    *(--p_stk) = (OS_STK)0x40C00000u;                            
+    *(--p_stk) = (OS_STK)0x40A00000u;                            
+    *(--p_stk) = (OS_STK)0x40800000u;                            
+    *(--p_stk) = (OS_STK)0x40400000u;                            
+    *(--p_stk) = (OS_STK)0x40000000u;                            
+    *(--p_stk) = (OS_STK)0x3F800000u;                            
+    *(--p_stk) = (OS_STK)0x00000000u;                            
+
     *(--p_stk) = (OS_STK)0x01000000uL;                           
     *(--p_stk) = (OS_STK)task;                                   
     *(--p_stk) = (OS_STK)OS_TaskReturn;                          
@@ -2824,9 +2860,9 @@ OS_STK  *OSTaskStkInit (void    (*task)(void *p_arg),
     *(--p_stk) = (OS_STK)p_arg;                                  
 
 
+    *(--p_stk) = (OS_STK)0xFFFFFFEDuL;                           
 
 
-    *(--p_stk) = (OS_STK)0xFFFFFFFDuL;                           
 
                                                                  
     *(--p_stk) = (OS_STK)0x11111111uL;                           
@@ -2838,7 +2874,25 @@ OS_STK  *OSTaskStkInit (void    (*task)(void *p_arg),
     *(--p_stk) = (OS_STK)0x05050505uL;                           
     *(--p_stk) = (OS_STK)0x04040404uL;                           
 
-#line 544 "UCOS_Port\\os_cpu_c.c"
+
+                                                                 
+    *(--p_stk) = (OS_STK)0x41F80000u;                            
+    *(--p_stk) = (OS_STK)0x41F00000u;                            
+    *(--p_stk) = (OS_STK)0x41E80000u;                            
+    *(--p_stk) = (OS_STK)0x41E00000u;                            
+    *(--p_stk) = (OS_STK)0x41D80000u;                            
+    *(--p_stk) = (OS_STK)0x41D00000u;                            
+    *(--p_stk) = (OS_STK)0x41C80000u;                            
+    *(--p_stk) = (OS_STK)0x41C00000u;                            
+    *(--p_stk) = (OS_STK)0x41B80000u;                            
+    *(--p_stk) = (OS_STK)0x41B00000u;                            
+    *(--p_stk) = (OS_STK)0x41A80000u;                            
+    *(--p_stk) = (OS_STK)0x41A00000u;                            
+    *(--p_stk) = (OS_STK)0x41980000u;                            
+    *(--p_stk) = (OS_STK)0x41900000u;                            
+    *(--p_stk) = (OS_STK)0x41880000u;                            
+    *(--p_stk) = (OS_STK)0x41800000u;                            
+
 
     return (p_stk);
 }
@@ -2864,7 +2918,7 @@ void  OSTaskSwHook (void)
 {
 
 
-
+    OS_CPU_FP_Reg_Push(OSTCBCur->OSTCBStkPtr);                   
 
 
 
@@ -2874,7 +2928,7 @@ void  OSTaskSwHook (void)
     ;
 
 
-
+    OS_CPU_FP_Reg_Pop(OSTCBHighRdy->OSTCBStkPtr);                
 
 }
 
@@ -2975,7 +3029,7 @@ void  OS_CPU_SysTickInitFreq (INT32U  cpu_freq)
     INT32U  cnts;
 
 
-    cnts = (cpu_freq / (INT32U)100u);                
+    cnts = (cpu_freq / (INT32U)1000u);                
 
     OS_CPU_SysTickInit(cnts);
 }
