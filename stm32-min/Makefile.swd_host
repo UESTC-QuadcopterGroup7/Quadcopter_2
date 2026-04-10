@@ -1,0 +1,45 @@
+TARGET := swd_host_tool
+BUILD_DIR := build_swd_host
+
+HOSTCC := gcc
+HOSTCFLAGS := -O2 -Wall -Wextra -std=c11 -Ihost_swd
+
+EXE := $(BUILD_DIR)/$(TARGET)
+OBJS := \
+	$(BUILD_DIR)/swd_status.o \
+	$(BUILD_DIR)/swd_transport_stub.o \
+	$(BUILD_DIR)/adiv5.o \
+	$(BUILD_DIR)/cortexm.o \
+	$(BUILD_DIR)/stm32f4_flash.o \
+	$(BUILD_DIR)/swd_tool_main.o
+
+.PHONY: all clean
+
+all: $(EXE)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/swd_status.o: host_swd/swd_status.c host_swd/swd_status.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/swd_transport_stub.o: host_swd/swd_transport_stub.c host_swd/swd_transport.h host_swd/swd_status.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/adiv5.o: host_swd/adiv5.c host_swd/adiv5.h host_swd/swd_protocol.h host_swd/swd_status.h host_swd/swd_transport.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/cortexm.o: host_swd/cortexm.c host_swd/cortexm.h host_swd/adiv5.h host_swd/swd_status.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/stm32f4_flash.o: host_swd/stm32f4_flash.c host_swd/stm32f4_flash.h host_swd/adiv5.h host_swd/swd_status.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/swd_tool_main.o: host_swd/swd_tool_main.c host_swd/adiv5.h host_swd/cortexm.h host_swd/stm32f4_flash.h host_swd/swd_status.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) -c $< -o $@
+
+$(EXE): $(OBJS)
+	$(HOSTCC) $(OBJS) -o $@
+
+clean:
+	rm -rf $(BUILD_DIR)

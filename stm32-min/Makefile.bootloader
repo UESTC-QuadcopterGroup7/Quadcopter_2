@@ -1,0 +1,84 @@
+BOOT_TARGET := stm32f401_flash_bootloader
+APP_TARGET := stm32f401_flash_app
+BUILD_DIR := build_stm32f401_bootloader
+
+CC := arm-none-eabi-gcc
+OBJCOPY := arm-none-eabi-objcopy
+SIZE := arm-none-eabi-size
+HOSTCC := gcc
+
+CPUFLAGS := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
+CFLAGS := $(CPUFLAGS) -ffreestanding -fdata-sections -ffunction-sections -fno-builtin -Os -g3 -Wall -Wextra -std=c11
+ASFLAGS := $(CPUFLAGS) -x assembler-with-cpp -g3
+LDFLAGS_BOOT := $(CPUFLAGS) -nostartfiles -nostdlib -Wl,--gc-sections -Wl,--build-id=none -T linker_stm32f401_boot.ld
+LDFLAGS_APP := $(CPUFLAGS) -nostartfiles -nostdlib -Wl,--gc-sections -Wl,--build-id=none -T linker_stm32f401_app.ld
+HOSTCFLAGS := -O2 -Wall -Wextra -std=c11
+
+BOOT_ELF := $(BUILD_DIR)/$(BOOT_TARGET).elf
+BOOT_BIN := $(BUILD_DIR)/$(BOOT_TARGET).bin
+BOOT_HEX := $(BUILD_DIR)/$(BOOT_TARGET).hex
+BOOT_MAP := $(BUILD_DIR)/$(BOOT_TARGET).map
+
+APP_ELF := $(BUILD_DIR)/$(APP_TARGET).elf
+APP_BIN := $(BUILD_DIR)/$(APP_TARGET).bin
+APP_HEX := $(BUILD_DIR)/$(APP_TARGET).hex
+APP_MAP := $(BUILD_DIR)/$(APP_TARGET).map
+
+STAGE_TOOL := $(BUILD_DIR)/stage_image_tool
+STAGE_BIN := $(BUILD_DIR)/$(APP_TARGET).stage.bin
+
+BOOT_OBJS := \
+	$(BUILD_DIR)/startup_boot_stm32f401.o \
+	$(BUILD_DIR)/bootloader_flash_main.o
+
+APP_OBJS := \
+	$(BUILD_DIR)/startup_app_stm32f401.o \
+	$(BUILD_DIR)/app_blink_pa5.o
+
+.PHONY: all clean
+
+all: $(BOOT_ELF) $(BOOT_BIN) $(BOOT_HEX) $(APP_ELF) $(APP_BIN) $(APP_HEX) $(STAGE_BIN)
+	$(SIZE) $(BOOT_ELF)
+	$(SIZE) $(APP_ELF)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/startup_boot_stm32f401.o: startup_boot_stm32f401.s | $(BUILD_DIR)
+	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/bootloader_flash_main.o: bootloader_flash_main.c boot_image_format.h stm32f401_boot_min.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/startup_app_stm32f401.o: startup_app_stm32f401.s | $(BUILD_DIR)
+	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/app_blink_pa5.o: app_blink_pa5.c stm32f401_min.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BOOT_ELF): $(BOOT_OBJS) linker_stm32f401_boot.ld
+	$(CC) $(LDFLAGS_BOOT) -Wl,-Map=$(BOOT_MAP) $(BOOT_OBJS) -o $@
+
+$(APP_ELF): $(APP_OBJS) linker_stm32f401_app.ld
+	$(CC) $(LDFLAGS_APP) -Wl,-Map=$(APP_MAP) $(APP_OBJS) -o $@
+
+$(BOOT_BIN): $(BOOT_ELF)
+	$(OBJCOPY) -O binary $< $@
+
+$(BOOT_HEX): $(BOOT_ELF)
+	$(OBJCOPY) -O ihex $< $@
+
+$(APP_BIN): $(APP_ELF)
+	$(OBJCOPY) -O binary $< $@
+
+$(APP_HEX): $(APP_ELF)
+	$(OBJCOPY) -O ihex $< $@
+
+$(STAGE_TOOL): stage_image_tool.c boot_image_format.h | $(BUILD_DIR)
+	$(HOSTCC) $(HOSTCFLAGS) $< -o $@
+
+$(STAGE_BIN): $(APP_BIN) $(STAGE_TOOL)
+	$(STAGE_TOOL) $(APP_BIN) $@
+
+clean:
+	rm -rf $(BUILD_DIR)
