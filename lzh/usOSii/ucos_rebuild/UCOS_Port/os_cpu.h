@@ -1,11 +1,11 @@
 #ifndef  OS_CPU_H
 #define  OS_CPU_H
 
-#ifdef   OS_CPU_GLOBALS
-#define  OS_CPU_EXT
-#else
-#define  OS_CPU_EXT  extern
-#endif
+// #ifdef   OS_CPU_GLOBALS
+// #define  OS_CPU_EXT
+// #else
+// #define  OS_CPU_EXT  extern
+// #endif
 
 
 
@@ -46,6 +46,9 @@ void       OS_CPU_SR_Restore(OS_CPU_SR cpu_sr);
 #endif
 
 #define OS_TASK_SW()    OSCtxSw()
+
+// Stack growth direction. It is used at OSInit(), which calls
+#define  OS_STK_GROWTH        1u
 
 void OSCtxSw(void);
 void OSIntCtxSw(void);

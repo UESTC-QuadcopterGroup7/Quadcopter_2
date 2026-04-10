@@ -86,8 +86,12 @@ static  void  AppTaskStart (void *p_arg)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    while (1) {
+    
+    OS_CPU_SysTickInitFreq(HAL_RCC_GetHCLKFreq());             /* 启动 OS 滴答定时器                                   */
 
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+        OSTimeDlyHMSM(0, 0, 0, 500);                           /* 延时 500 ms                                          */
     }
 }
 

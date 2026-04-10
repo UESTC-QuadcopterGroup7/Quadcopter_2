@@ -106,7 +106,7 @@ OS_CPU_First_PendSVHandler
             LDR     R0,     =OSTCBHighRdy
             LDR     R0,     [R0]
             LDR     R0,     [R0]
-            
+
             ;pop stack
             LDMFD   R0!,    {R4-R11}
             MSR     PSP,    R0
@@ -126,6 +126,6 @@ OS_CPU_First_PendSVHandler
             BX      LR
 
             NOP
-
+            ALIGN
             END
 
