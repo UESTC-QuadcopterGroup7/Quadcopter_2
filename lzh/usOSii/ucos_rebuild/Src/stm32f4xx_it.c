@@ -39,3 +39,5 @@ void  OS_CPU_SysTickHandler (void)
 
     OSIntExit();                                                /* Tell uC/OS-II that we are leaving the ISR            */
 }
+
+ // OS_CPU_PendSVHandler(void) {}

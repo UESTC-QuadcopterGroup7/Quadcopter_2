@@ -30,6 +30,10 @@ typedef double         FP64;                     /* Double precision floating po
 typedef unsigned int   OS_STK;                   /* Each stack entry is 32-bit wide                    */
 typedef unsigned int   OS_CPU_SR;                /* Define size of CPU status register (PSR = 32 bits) */
 
+
+/*
+ * Critical method section
+ */
 #define  OS_CRITICAL_METHOD   3u
 
 // #define OS_ENTER_CRITICAL() {}
@@ -47,7 +51,7 @@ void       OS_CPU_SR_Restore(OS_CPU_SR cpu_sr);
 
 #define OS_TASK_SW()    OSCtxSw()
 
-// Stack growth direction. It is used at OSInit(), which calls
+// Stack growth direction. It is used in OSInit(), which calls OS_InitTaskIdle().
 #define  OS_STK_GROWTH        1u
 
 void OSCtxSw(void);
