@@ -3,16 +3,25 @@
         {
             "name": "Sample",
             "includePath": [
-                "d:\\github\\FourAxisProject\\Motor\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Include",
-                "d:\\github\\FourAxisProject\\Motor\\Drivers\\CMSIS\\Include",
-                "d:\\github\\FourAxisProject\\Motor\\Drivers\\STM32F4xx_HAL_Driver\\Inc",
-                "d:\\github\\FourAxisProject\\Motor\\Inc",
-                "d:\\github\\FourAxisProject\\Motor\\MyLib",
+                "d:\\github\\Quadcopter_2\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Include",
+                "d:\\github\\Quadcopter_2\\Drivers\\CMSIS\\Include",
+                "d:\\github\\Quadcopter_2\\Drivers\\STM32F4xx_HAL_Driver\\Inc",
+                "d:\\github\\Quadcopter_2\\Inc",
+                "d:\\github\\Quadcopter_2\\MyLib",
+                "d:\\github\\Quadcopter_2\\Port",
+                "d:\\github\\Quadcopter_2\\Source",
+                "d:\\github\\Quadcopter_2\\Config",
+                "d:\\github\\Quadcopter_2\\ucCPU",
+                "d:\\github\\Quadcopter_2\\ucLib",
+                "d:\\github\\Quadcopter_2\\SEGGER\\RTT",
+                "d:\\github\\Quadcopter_2\\SEGGER\\SystemView",
+                "d:\\github\\Quadcopter_2\\SEGGER\\Config",
+                "d:\\github\\Quadcopter_2\\SEGGER\\uCOS-II",
                 "C:\\Keil_v5\\ARM\\ARMCC\\include",
                 "C:\\Keil_v5\\ARM\\ARMCC\\include\\rw",
-                "d:\\github\\FourAxisProject\\Motor\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Source",
-                "d:\\github\\FourAxisProject\\Motor\\Drivers\\STM32F4xx_HAL_Driver\\Src",
-                "d:\\github\\FourAxisProject\\Motor\\Src"
+                "d:\\github\\Quadcopter_2\\Drivers\\CMSIS\\Device\\ST\\STM32F4xx\\Source",
+                "d:\\github\\Quadcopter_2\\Drivers\\STM32F4xx_HAL_Driver\\Src",
+                "d:\\github\\Quadcopter_2\\Src"
             ],
             "defines": [
                 "USE_HAL_DRIVER",

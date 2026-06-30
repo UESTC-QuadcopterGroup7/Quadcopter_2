@@ -1,0 +1,29 @@
+# Keil/MDK build outputs
+/Objects/**
+/Listings/**
+
+
+# Build artifacts
+*.o
+*.d
+*.dep
+*.crf
+*.axf
+*.map
+*.lst
+*.i
+*.lnp
+*.htm
+
+# Logs and locks
+*.log
+*.lock
+
+# VS Code local runtime logs
+.vscode/uv4.log
+.vscode/uv4.log.lock
+.vscode/keil-assistant.log
+
+# OS-generated files
+Thumbs.db
+.DS_Store
