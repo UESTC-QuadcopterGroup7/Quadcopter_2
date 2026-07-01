@@ -1,11 +1,11 @@
+#include <stdint.h>
 #include "SEGGER_SYSVIEW.h"
 #include "system_stm32f4xx.h"
 
 /*
- * SystemView configuration staged for the quadcopter uC/OS-II port.
- * This file is intentionally added to Keil as a non-compiled file for now.
- * To enable SystemView later, compile this file together with
- * SEGGER_SYSVIEW_uCOSII.c and enable the uC/OS-II trace hooks.
+ * SystemView configuration for the quadcopter uC/OS-II port.
+ * Build this file together with SEGGER_SYSVIEW_uCOSII.c when
+ * uC/OS-II trace hooks are enabled.
  */
 extern const SEGGER_SYSVIEW_OS_API SYSVIEW_X_OS_TraceAPI;
 

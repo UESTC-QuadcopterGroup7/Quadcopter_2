@@ -1407,12 +1407,12 @@
           <Files>
             <File>
               <FileName>SEGGER_SYSVIEW_Config_Quadcopter.c</FileName>
-              <FileType>5</FileType>
+              <FileType>1</FileType>
               <FilePath>.\SEGGER\uCOS-II\SEGGER_SYSVIEW_Config_Quadcopter.c</FilePath>
             </File>
             <File>
               <FileName>SEGGER_SYSVIEW_uCOSII.c</FileName>
-              <FileType>5</FileType>
+              <FileType>1</FileType>
               <FilePath>.\SEGGER\uCOS-II\SEGGER_SYSVIEW_uCOSII.c</FilePath>
             </File>
             <File>

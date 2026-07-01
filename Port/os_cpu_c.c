@@ -165,7 +165,7 @@ void  OSInitHookBegin (void)
 #if OS_CPU_HOOKS_EN > 0u
 void  OSInitHookEnd (void)
 {
-
+    OS_TRACE_INIT();                                             /* Initialize SystemView/RTT after OS core init.        */
 }
 #endif
 
