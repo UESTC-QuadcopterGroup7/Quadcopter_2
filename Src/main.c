@@ -60,6 +60,8 @@ void SystemClock_Config(void)
 
 int main(void)
 {
+    INT8U err;
+
     HAL_Init();
     SystemClock_Config();
 
@@ -69,6 +71,7 @@ int main(void)
                  (void *)0,
                  &AppTaskStartStk[APP_CFG_STARTUP_TASK_STK_SIZE - 1],
                  APP_CFG_STARTUP_TASK_PRIO);
+    OSTaskNameSet(APP_CFG_STARTUP_TASK_PRIO, (INT8U *)(void *)"AppTaskStart", &err);
 
     OSStart();
 
@@ -87,6 +90,8 @@ static void BSP_Init(void)
 
 static void AppTaskStart(void *p_arg)
 {
+    INT8U err;
+
     (void)p_arg;
 
     OS_CPU_SysTickInitFreq(SystemCoreClock);
@@ -96,11 +101,13 @@ static void AppTaskStart(void *p_arg)
                  (void *)0,
                  &AppTaskSensorStk[APP_CFG_SENSOR_TASK_STK_SIZE - 1],
                  APP_CFG_SENSOR_TASK_PRIO);
+    OSTaskNameSet(APP_CFG_SENSOR_TASK_PRIO, (INT8U *)(void *)"AppTaskSensor", &err);
 
     OSTaskCreate(AppTaskDebug,
                  (void *)0,
                  &AppTaskDebugStk[APP_CFG_DEBUG_TASK_STK_SIZE - 1],
                  APP_CFG_DEBUG_TASK_PRIO);
+    OSTaskNameSet(APP_CFG_DEBUG_TASK_PRIO, (INT8U *)(void *)"AppTaskDebug", &err);
 
     while (1) {
         OSTimeDlyHMSM(0, 0, 1, 0);
@@ -132,5 +139,4 @@ void Error_Handler(void)
     while (1) {
     }
 }
-
 

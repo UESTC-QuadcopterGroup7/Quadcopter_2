@@ -95,6 +95,9 @@ typedef struct {
     uint16_t C6; // Temperature coefficient of the temperature TEMPSENS
 } MS561101BA_CalibData_t;
 
+extern MS561101BA_CalibData_t ms5611_calib;
+extern uint8_t ms5611_calib_loaded;
+
 // MS561101BA 测量数据结构体
 typedef struct {
     float temperature; // °C
@@ -113,5 +116,6 @@ uint32_t MS561101BA_ReadADC(void);
 uint32_t MS561101BA_ReadPressureRaw(uint8_t osr);
 uint32_t MS561101BA_ReadTemperatureRaw(uint8_t osr);
 uint8_t MS561101BA_GetData(MS561101BA_Data_t* data, uint8_t osr);
+uint8_t MS561101BA_Calculate(uint32_t D1, uint32_t D2, MS561101BA_Data_t* data);
 
 #endif

@@ -132,9 +132,9 @@ void HMC5883L_GetData(int16_t* X, int16_t* Y, int16_t* Z) {
  */
 #include <math.h>
 
-// 内部校准数据与加载标志
-static MS561101BA_CalibData_t ms5611_calib;
-static uint8_t ms5611_calib_loaded = 0;
+// 校准数据与加载标志（非静态，供 ReadPeripherals 等模块访问）
+MS561101BA_CalibData_t ms5611_calib;
+uint8_t ms5611_calib_loaded = 0;
 
 // 发送复位命令
 void MS561101BA_Reset(void) {
@@ -261,12 +261,10 @@ void MS561101BA_Init(void) {
     ms5611_calib_loaded = 1;
 }
 
-// 获取补偿后的温度、气压与海拔
-uint8_t MS561101BA_GetData(MS561101BA_Data_t* data, uint8_t osr) {
+// 纯计算函数：根据原始 ADC 值 D1、D2 和已加载的校准系数，计算补偿后的温度、气压与海拔。
+// 可从 RTOS 任务中调用，不需要阻塞等待 I2C（D1/D2 由外部通过非阻塞方式获取）。
+uint8_t MS561101BA_Calculate(uint32_t D1, uint32_t D2, MS561101BA_Data_t* data) {
     if (!ms5611_calib_loaded) return 0;
-
-    uint32_t D2 = MS561101BA_ReadTemperatureRaw(osr);
-    uint32_t D1 = MS561101BA_ReadPressureRaw(osr);
 
     int32_t dT = (int32_t)D2 - ((int32_t)ms5611_calib.C5 << 8);
     int32_t TEMP = 2000 + (int32_t)(((int64_t)dT * (int64_t)ms5611_calib.C6) / 8388608); // 2^23
@@ -296,5 +294,12 @@ uint8_t MS561101BA_GetData(MS561101BA_Data_t* data, uint8_t osr) {
     data->altitude = 44330.0f * (1.0f - powf(data->pressure / 101325.0f, 0.1903f));
 
     return 1;
+}
+
+// 阻塞式完整读取（内部调用 HAL_Delay，保留用于非 RTOS 上下文）
+uint8_t MS561101BA_GetData(MS561101BA_Data_t* data, uint8_t osr) {
+    uint32_t D2 = MS561101BA_ReadTemperatureRaw(osr);
+    uint32_t D1 = MS561101BA_ReadPressureRaw(osr);
+    return MS561101BA_Calculate(D1, D2, data);
 }
 

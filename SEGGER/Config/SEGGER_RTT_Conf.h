@@ -27,6 +27,8 @@ Purpose : User configuration file for RTT.
 *
 **********************************************************************
 */
+#define SEGGER_RTT_MAX_INTERRUPT_PRIORITY  0x10
+#define SEGGER_SYSVIEW_RTT_BUFFER_SIZE     4096
 
 #endif
 /*************************** End of file ****************************/
