@@ -19,10 +19,8 @@ volatile MS5611_Read_t   g_MS5611   = {0};
 /* tick_counter: 每调用一次 Process() 自增 1，等价于 5ms 时间分辨率 */
 static uint32_t tick_counter = 0;
 
-/* ---- HMC5883L 分频: 每 3 tick (15ms ≈ 67Hz) 读取一次 ---- */
-#define HMC_DIVIDER  3
-
 /* ---- MS5611 非阻塞状态机 ---- */
+#if 0 /* 暂停气压计测量，保留代码以便恢复。 */
 enum {
     MS5611_IDLE    = 0,
     MS5611_WAIT_D2 = 1,
@@ -37,6 +35,7 @@ static uint8_t  ms5611_state    = MS5611_IDLE;
 static uint8_t  ms5611_wait_ctr = 0;
 static uint32_t ms5611_d2_raw   = 0;
 static uint32_t ms5611_d1_raw   = 0;
+#endif
 
 /* ---- UART 调试输出分频: 每 DBG_DIV ticks 打印一次 ---- */
 #define DBG_DIV  200   /* 200 tick = 1s */
@@ -47,7 +46,7 @@ static uint32_t ms5611_d1_raw   = 0;
 void ReadPeripherals_Init(void) {
     MPU6050_Init();
     HMC5883L_Init();
-    MS561101BA_Init();       /* 复位 + 读取 PROM（初始化期间 HAL_Delay 可用） */
+    // MS561101BA_Init();    /* 暂停气压计初始化：复位 + 读取 PROM */
     tick_counter = 0;
 }
 
@@ -55,7 +54,7 @@ void ReadPeripherals_Init(void) {
  *  ReadPeripherals_Process
  *
  *  由 AppTaskSensor 每 5ms 调用一次。
- *  三个传感器采用不同读取速率，MS5611 使用非阻塞状态机避免 HAL_Delay。
+ *  当前仅采集 MPU6050 和 HMC5883L，MS5611 测量已暂停。
  * ================================================================ */
 void ReadPeripherals_Process(void) {
     uint32_t now = tick_counter;
@@ -87,9 +86,9 @@ void ReadPeripherals_Process(void) {
     }
 
     /* ============================================================
-     *  2. HMC5883L —— 每 3 tick 读取一次 (15ms ≈ 67Hz)
+     *  2. HMC5883L —— 与 MPU6050 一样，每次调用均读取
      * ============================================================ */
-    if ((now % HMC_DIVIDER) == 0) {
+    {
         int16_t mx, my, mz;
         HMC5883L_GetData(&mx, &my, &mz);
 
@@ -106,6 +105,7 @@ void ReadPeripherals_Process(void) {
         }
     }
 
+    #if 0 /* 暂停气压计采集、计算和串口输出。 */
     /* ============================================================
      *  3. MS5611 —— 非阻塞状态机
      *
@@ -159,6 +159,7 @@ void ReadPeripherals_Process(void) {
             ms5611_state = MS5611_IDLE;
             break;
     }
+    #endif
 
     tick_counter++;
 }

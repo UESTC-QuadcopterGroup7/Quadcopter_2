@@ -27,6 +27,9 @@ extern uint8_t already_init;
 #define	MPU6050_PWR_MGMT_2		0x6C
 #define	MPU6050_WHO_AM_I		0x75
 
+#define MPU6050_USER_CTRL   0x6A
+#define MPU6050_INT_PIN_CFG 0x37
+
 void MPU6050_WriteReg(uint8_t RegAddr, uint8_t data);
 void MPU6050_Init(void);
 uint8_t MPU6050_ReadReg(uint8_t RegAddr);
@@ -47,6 +50,9 @@ uint8_t MPU6050_GetId(void);
 #define HMC5883L_ID_A           0x0A
 #define HMC5883L_ID_B           0x0B
 #define HMC5883L_ID_C           0x0C
+
+extern volatile uint8_t g_HmcAddressAck;
+extern volatile uint8_t g_HmcIdentity[3];
 
 void HMC5883L_Init(void);
 uint8_t HMC5883L_ReadReg(uint8_t RegAddr);

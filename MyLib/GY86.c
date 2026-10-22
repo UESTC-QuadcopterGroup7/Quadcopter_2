@@ -4,6 +4,9 @@
 
 uint8_t already_init = 0;
 
+volatile uint8_t g_HmcAddressAck = 1;
+volatile uint8_t g_HmcIdentity[3] = {0xFF, 0xFF, 0xFF};
+
 /*
  * MPU6050配置函数
  */
@@ -29,6 +32,9 @@ void MPU6050_Init(void) {
 	MPU6050_WriteReg(MPU6050_CONFIG,0x02);
 	MPU6050_WriteReg(MPU6050_GYRO_CONFIG,0x18);
 	MPU6050_WriteReg(MPU6050_ACCEL_CONFIG,0x18);
+        /* 关闭 MPU 的 I2C 主机并开启旁路，让 STM32 直接访问辅助总线地磁计。 */
+        MPU6050_WriteReg(MPU6050_USER_CTRL,0x00);
+        MPU6050_WriteReg(MPU6050_INT_PIN_CFG,0x02);
 }
 
 uint8_t MPU6050_ReadReg(uint8_t RegAddr) {
@@ -92,6 +98,17 @@ void HMC5883L_Init(void) {
 		MyI2C_Init();
 		already_init = 1;
 	}
+        /* ACK 为 0 表示器件应答；正常 HMC5883L 的 ID 为 48 34 33（H43）。 */
+        MyI2C_Start();
+        MyI2C_SendByte(HMC5883L_ADDRESS);
+        g_HmcAddressAck = MyI2C_ReceiveAck();
+        MyI2C_Stop();
+        if (g_HmcAddressAck != 0) {
+                return;
+        }
+        g_HmcIdentity[0] = HMC5883L_ReadReg(HMC5883L_ID_A);
+        g_HmcIdentity[1] = HMC5883L_ReadReg(HMC5883L_ID_B);
+        g_HmcIdentity[2] = HMC5883L_ReadReg(HMC5883L_ID_C);
 	HMC5883L_WriteReg(HMC5883L_CONFIG_A,0x18);
 	HMC5883L_WriteReg(HMC5883L_CONFIG_B,0x20);
 	HMC5883L_WriteReg(HMC5883L_MODE,0x00);
@@ -302,4 +319,3 @@ uint8_t MS561101BA_GetData(MS561101BA_Data_t* data, uint8_t osr) {
     uint32_t D1 = MS561101BA_ReadPressureRaw(osr);
     return MS561101BA_Calculate(D1, D2, data);
 }
-

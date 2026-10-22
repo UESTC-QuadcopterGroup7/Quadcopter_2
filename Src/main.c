@@ -85,7 +85,7 @@ static void BSP_Init(void)
     IC_Init();
     BLDC_Init();
     ReadPeripherals_Init();
-    UART1_FULL_INIT(9600);
+    UART1_FULL_INIT(115200);
 }
 
 static void AppTaskStart(void *p_arg)
