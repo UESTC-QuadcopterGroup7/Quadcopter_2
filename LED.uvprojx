@@ -1135,6 +1135,26 @@
               <FileType>5</FileType>
               <FilePath>.\MyLib\ReadPeripherals.h</FilePath>
             </File>
+            <File>
+              <FileName>Quaternion.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\MyLib\Quaternion.c</FilePath>
+            </File>
+            <File>
+              <FileName>Quaternion.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\Quaternion.h</FilePath>
+            </File>
+            <File>
+              <FileName>Attitude.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\MyLib\Attitude.c</FilePath>
+            </File>
+            <File>
+              <FileName>Attitude.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\Attitude.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

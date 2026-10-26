@@ -1,6 +1,7 @@
 #include "main.h"
 #include "GY86.h"
 #include "ReadPeripherals.h"
+#include "Attitude.h"
 #include "UART_Set.h"
 #include "ucos_ii.h"
 #include <stdio.h>
@@ -12,6 +13,7 @@
 volatile MPU6050_Read_t  g_MPU6050  = {0};
 volatile HMC5883L_Read_t g_HMC5883L = {0};
 volatile MS5611_Read_t   g_MS5611   = {0};
+volatile Attitude_Read_t g_Attitude = {0};
 
 /* ================================================================
  *  本地状态变量
@@ -20,6 +22,15 @@ volatile MS5611_Read_t   g_MS5611   = {0};
 /* tick_counter: 每调用一次 Process() 自增 1，等价于 5ms 时间分辨率 */
 static uint32_t tick_counter = 0;
 static uint8_t mpu_calibration_pending = 1;
+
+/* ---- 姿态解算状态 ---- */
+static Attitude_t s_attitude;
+static uint32_t   s_attitude_last_ms = 0;
+static uint8_t    s_attitude_ready = 0;
+static uint8_t    s_attitude_tx_div = 0;
+
+/* 通信任务每 10ms 调用一次 Transmit，每 5 次发送一帧姿态，即约 20Hz。 */
+#define ATTITUDE_TX_DIV   5u
 
 /* ---- MS5611 非阻塞状态机 ---- */
 #if 0 /* 暂停气压计测量，保留代码以便恢复。 */
@@ -51,10 +62,32 @@ void ReadPeripherals_Init(void) {
 }
 
 /* ================================================================
+ *  PublishAttitude
+ *
+ *  把姿态解算结果换算成角度后写入共享结构体。
+ * ================================================================ */
+static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags)
+{
+    float roll_deg;
+    float pitch_deg;
+    float yaw_deg;
+
+    Attitude_GetEulerDegrees(att, &roll_deg, &pitch_deg, &yaw_deg);
+
+    g_Attitude.roll  = roll_deg;
+    g_Attitude.pitch = pitch_deg;
+    g_Attitude.yaw   = yaw_deg;
+    g_Attitude.tick  = tick;
+    g_Attitude.flags = flags;
+    g_Attitude.fresh = 1;
+}
+
+/* ================================================================
  *  ReadPeripherals_Process
  *
- *  由 AppTaskSensor 每 5ms 调用一次。
- *  当前仅采集 MPU6050 和 HMC5883L，MS5611 测量已暂停。
+ *  由 AppTaskSensor 循环调用（间隔 1ms 延时 + I2C 读取时间）。
+ *  采集 MPU6050 和 HMC5883L，并用 Madgwick 滤波解算姿态；
+ *  MS5611 测量已暂停。
  * ================================================================ */
 void ReadPeripherals_Process(void) {
     uint32_t now = tick_counter;
@@ -100,6 +133,62 @@ void ReadPeripherals_Process(void) {
         g_HMC5883L.mz   = mz;
         g_HMC5883L.tick = now;
         g_HMC5883L.fresh = 1;
+    }
+
+    /* ============================================================
+     *  3. 姿态解算 —— Madgwick 梯度下降滤波（四元数）
+     *
+     *  输入是已做零偏补偿的原始计数，dt 取自 HAL_GetTick()，因此采样周期
+     *  不必固定；代价是 dt 只有 1ms 分辨率。滤波器内部会限幅 dt。
+     * ============================================================ */
+    {
+        int16_t accel[3];
+        int16_t gyro[3];
+        int16_t mag[3];
+        const int16_t *mag_ptr = 0;
+        uint32_t now_ms = HAL_GetTick();
+
+        accel[0] = g_MPU6050.ax;
+        accel[1] = g_MPU6050.ay;
+        accel[2] = g_MPU6050.az;
+
+        gyro[0] = g_MPU6050.gx;
+        gyro[1] = g_MPU6050.gy;
+        gyro[2] = g_MPU6050.gz;
+
+        if (g_HmcAddressAck == 0) {
+            /*
+             * 磁力计必须映射到与加速度计、陀螺仪相同的机体系后才能参与解算。
+             * GY-86 模块上 HMC5883L 与 MPU6050 的轴向是否一致要以实物为准，
+             * 这里按两者同轴处理；若实测航向随横滚变化，请在此调整顺序或符号。
+             */
+            mag[0] = g_HMC5883L.mx;
+            mag[1] = g_HMC5883L.my;
+            mag[2] = g_HMC5883L.mz;
+            mag_ptr = mag;
+        }
+
+        if (s_attitude_ready == 0) {
+            /* 第一个可信样本：先对准水平与航向，之后才进入滤波更新。 */
+            if (Attitude_InitRaw(&s_attitude, accel, mag_ptr) != 0) {
+                uint8_t flags = ATTITUDE_FLAG_ACCEL;
+
+                if (s_attitude.mag_valid != 0) {
+                    flags |= ATTITUDE_FLAG_MAG;
+                }
+                s_attitude_ready = 1;
+                s_attitude_last_ms = now_ms;
+                PublishAttitude(&s_attitude, now, flags);
+            }
+        } else {
+            float dt = (float)(uint32_t)(now_ms - s_attitude_last_ms) * 0.001f;
+            uint8_t flags = Attitude_UpdateRaw(&s_attitude, accel, gyro, mag_ptr, dt);
+
+            s_attitude_last_ms = now_ms;
+            if (flags != 0) {
+                PublishAttitude(&s_attitude, now, flags);
+            }
+        }
     }
 
     #if 0 /* 暂停气压计采集、计算和串口输出。 */
@@ -158,6 +247,7 @@ void ReadPeripherals_Transmit(void)
 {
     MPU6050_Read_t mpu;
     HMC5883L_Read_t hmc;
+    Attitude_Read_t att;
     OS_CPU_SR cpu_sr;
     char buf[128];
 
@@ -165,6 +255,7 @@ void ReadPeripherals_Transmit(void)
     OS_ENTER_CRITICAL();
     mpu = g_MPU6050;
     hmc = g_HMC5883L;
+    att = g_Attitude;
     OS_EXIT_CRITICAL();
 
     if (mpu.fresh != 0) {
@@ -178,5 +269,19 @@ void ReadPeripherals_Transmit(void)
         snprintf(buf, sizeof(buf),
                  "HMC M:%d,%d,%d\r\n", hmc.mx, hmc.my, hmc.mz);
         HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)strlen(buf), 1000);
+    }
+
+    /*
+     * 姿态帧约 30 字节，每 10ms 发一帧会明显挤占 115200 的带宽，
+     * 因此每 ATTITUDE_TX_DIV 次发送一帧（约 20Hz），角度单位是度。
+     */
+    if (att.fresh != 0) {
+        if (++s_attitude_tx_div >= ATTITUDE_TX_DIV) {
+            s_attitude_tx_div = 0;
+            snprintf(buf, sizeof(buf),
+                     "ATT R:%.2f P:%.2f Y:%.2f\r\n",
+                     (double)att.roll, (double)att.pitch, (double)att.yaw);
+            HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)strlen(buf), 1000);
+        }
     }
 }

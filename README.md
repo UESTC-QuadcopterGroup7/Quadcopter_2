@@ -76,7 +76,9 @@ Quadcopter_2/
 │   ├── BMP180.c/h                   #   气压计
 │   ├── MyI2C.c/h                    #   I2C 软件模拟
 │   ├── Delay.c/h                    #   延时函数
-│   ├── ReadPeripherals.c/h          #   外设数据汇总读取
+│   ├── ReadPeripherals.c/h          #   外设数据汇总读取 + 姿态解算调用
+│   ├── Quaternion.c/h               #   四元数数学库 (姿态表示与换算)
+│   ├── Attitude.c/h                 #   Madgwick 姿态解算 (四元数)
 │   └── GPIO_Set.h / PWM_Set.h / ...  # GPIO/PWM/USART 配置
 │
 ├── Drivers/                         # STM32 HAL 库

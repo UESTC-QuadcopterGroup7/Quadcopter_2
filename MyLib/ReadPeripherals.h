@@ -30,9 +30,23 @@ typedef struct {
     uint8_t  fresh;
 } MS5611_Read_t;
 
+/*
+ * 姿态快照：Madgwick 四元数解算结果（见 Attitude.h）。
+ * 角度单位为度；坐标系与符号约定见 Quaternion.h。
+ */
+typedef struct {
+    float    roll;             // 横滚 (°)，右滚为正
+    float    pitch;            // 俯仰 (°)，抬头为正
+    float    yaw;              // 偏航 (°)，右转为正，即罗盘航向（北 0°，东 +90°）
+    uint32_t tick;             // 采样时刻 tick_counter
+    uint8_t  fresh;            // 新数据标志：写入方置1
+    uint8_t  flags;            // Attitude 更新标志，见 ATTITUDE_FLAG_*
+} Attitude_Read_t;
+
 extern volatile MPU6050_Read_t  g_MPU6050;
 extern volatile HMC5883L_Read_t g_HMC5883L;
 extern volatile MS5611_Read_t   g_MS5611;
+extern volatile Attitude_Read_t g_Attitude;
 
 void ReadPeripherals_Init(void);
 void ReadPeripherals_Process(void);
