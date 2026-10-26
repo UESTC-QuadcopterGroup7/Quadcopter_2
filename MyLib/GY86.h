@@ -1,6 +1,8 @@
 #ifndef __GY86_H
 #define __GY86_H
 
+#include <stdint.h>
+
 extern uint8_t already_init;
 #define MPU6050_ADDRESS 		0xD0
 #define	MPU6050_SMPLRT_DIV		0x19
@@ -29,6 +31,22 @@ extern uint8_t already_init;
 
 #define MPU6050_USER_CTRL   0x6A
 #define MPU6050_INT_PIN_CFG 0x37
+
+#define MPU6050_ACCEL_CONFIG_VALUE 0x18u
+#define MPU6050_ACCEL_1G_RAW (16384 >> ((MPU6050_ACCEL_CONFIG_VALUE >> 3) & 0x03u))
+#define MPU6050_CALIBRATION_SAMPLES 100u
+
+typedef struct {
+    int32_t ax, ay, az;
+    int32_t gx, gy, gz;
+} MPU6050_Offset_t;
+
+extern volatile MPU6050_Offset_t g_MpuOffset;
+extern volatile uint16_t g_MpuCalibrationCount;
+extern volatile uint8_t g_MpuCalibrationActive;
+
+void MPU6050_CalibrationStart(void);
+uint8_t MPU6050_CalibrationStatus(void);
 
 void MPU6050_WriteReg(uint8_t RegAddr, uint8_t data);
 void MPU6050_Init(void);

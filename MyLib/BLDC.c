@@ -87,9 +87,25 @@ void BLDC_Stop3(void)
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, BLDC_OFF_US);
 }
 
-void Calibrate_BLDC(void) {
-    BLDC_SetThrottle_us(2000, 3);
+// void Calibrate_BLDC(void) {
+//     BLDC_SetThrottle_us(2000, 3);
+//     HAL_Delay(5000);
+//     BLDC_SetThrottle_us(1000, 3);
+//     HAL_Delay(1000);
+// }
+
+void Calibrate_BLDC_All(void)
+{
+    uint8_t idx;
+
+    /* 四路先全部置最大脉宽，再统一等待，避免逐个校准。 */
+    for (idx = 1; idx <= 4; idx++) {
+        BLDC_SetThrottle_us(BLDC_MAX_US, idx);
+    }
     HAL_Delay(5000);
-    BLDC_SetThrottle_us(1000, 3);
+
+    for (idx = 1; idx <= 4; idx++) {
+        BLDC_SetThrottle_us(BLDC_MIN_US, idx);
+    }
     HAL_Delay(1000);
 }

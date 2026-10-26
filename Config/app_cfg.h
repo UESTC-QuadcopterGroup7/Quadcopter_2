@@ -65,7 +65,8 @@
 
 #define  APP_CFG_STARTUP_TASK_PRIO         3u
 #define  APP_CFG_SENSOR_TASK_PRIO          6u
-#define  APP_CFG_DEBUG_TASK_PRIO          10u
+#define  APP_CFG_COM_TASK_PRIO             9u
+// #define  APP_CFG_DEBUG_TASK_PRIO          10u
 
 #ifndef  OS_LOWEST_PRIO
 #define  OS_LOWEST_PRIO                    63u
@@ -83,6 +84,7 @@
 
 #define  APP_CFG_STARTUP_TASK_STK_SIZE     256u
 #define  APP_CFG_SENSOR_TASK_STK_SIZE      512u
+#define  APP_CFG_COM_TASK_STK_SIZE         512u
 #define  APP_CFG_DEBUG_TASK_STK_SIZE       256u
 
 
@@ -118,5 +120,4 @@
 */
 
 #endif                                                          /* End of module include.              */
-
 

@@ -36,5 +36,6 @@ extern volatile MS5611_Read_t   g_MS5611;
 
 void ReadPeripherals_Init(void);
 void ReadPeripherals_Process(void);
+void ReadPeripherals_Transmit(void);
 
 #endif

@@ -16,12 +16,14 @@ uint16_t PWM_IN_Wid[4];
 
 static OS_STK AppTaskStartStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 static OS_STK AppTaskSensorStk[APP_CFG_SENSOR_TASK_STK_SIZE];
-static OS_STK AppTaskDebugStk[APP_CFG_DEBUG_TASK_STK_SIZE];
+static OS_STK APPTaskComStk[APP_CFG_COM_TASK_STK_SIZE];
+// static OS_STK AppTaskDebugStk[APP_CFG_DEBUG_TASK_STK_SIZE];
 
 static void BSP_Init(void);
 static void AppTaskStart(void *p_arg);
 static void AppTaskSensor(void *p_arg);
-static void AppTaskDebug(void *p_arg);
+static void APPTaskCom(void *p_arg);
+// static void AppTaskDebug(void *p_arg);
 void SystemClock_Config(void);
 
 void SystemClock_Config(void)
@@ -81,33 +83,46 @@ int main(void)
 
 static void BSP_Init(void)
 {
-    OLED_Init();
+    // OLED_Init();
     IC_Init();
     BLDC_Init();
     ReadPeripherals_Init();
-    UART1_FULL_INIT(115200);
+    UART1_FULL_INIT(115200); // must 115200 baudrate
 }
 
 static void AppTaskStart(void *p_arg)
 {
-    INT8U err;
+    // INT8U err;
 
     (void)p_arg;
 
     OS_CPU_SysTickInitFreq(SystemCoreClock);
     BSP_Init();
 
+    // /* 同时校准 TIM3 四路电调；必须全部拆桨，校准完成后注释此调用。 */
+    // Calibrate_BLDC_All();
+
+    /* 四路保持最小油门脉宽，让电调完成上电解锁。 */
+    BLDC_SetThrottle_us(BLDC_MIN_US, 1);
+    BLDC_SetThrottle_us(BLDC_MIN_US, 2);
+    BLDC_SetThrottle_us(BLDC_MIN_US, 3);
+    BLDC_SetThrottle_us(BLDC_MIN_US, 4);
+    OSTimeDlyHMSM(0, 0, 5, 0);
+
     OSTaskCreate(AppTaskSensor,
                  (void *)0,
                  &AppTaskSensorStk[APP_CFG_SENSOR_TASK_STK_SIZE - 1],
                  APP_CFG_SENSOR_TASK_PRIO);
-    OSTaskNameSet(APP_CFG_SENSOR_TASK_PRIO, (INT8U *)(void *)"AppTaskSensor", &err);
 
-    OSTaskCreate(AppTaskDebug,
-                 (void *)0,
-                 &AppTaskDebugStk[APP_CFG_DEBUG_TASK_STK_SIZE - 1],
-                 APP_CFG_DEBUG_TASK_PRIO);
-    OSTaskNameSet(APP_CFG_DEBUG_TASK_PRIO, (INT8U *)(void *)"AppTaskDebug", &err);
+    OSTaskCreate(APPTaskCom,
+                (void *)0,
+                 &APPTaskComStk[APP_CFG_COM_TASK_STK_SIZE - 1],
+                 APP_CFG_COM_TASK_PRIO);
+
+    // OSTaskCreate(AppTaskDebug,
+    //              (void *)0,
+    //              &AppTaskDebugStk[APP_CFG_DEBUG_TASK_STK_SIZE - 1],
+    //              APP_CFG_DEBUG_TASK_PRIO);
 
     while (1) {
         OSTimeDlyHMSM(0, 0, 1, 0);
@@ -120,18 +135,28 @@ static void AppTaskSensor(void *p_arg)
 
     while (1) {
         ReadPeripherals_Process();
-        OSTimeDlyHMSM(0, 0, 0, 5);
+        OSTimeDlyHMSM(0, 0, 0, 1);
     }
 }
 
-static void AppTaskDebug(void *p_arg)
+static void APPTaskCom(void *p_arg)
 {
     (void)p_arg;
 
     while (1) {
-        OSTimeDlyHMSM(0, 0, 1, 0);
+        ReadPeripherals_Transmit();
+        OSTimeDlyHMSM(0, 0, 0, 10);
     }
 }
+
+// static void AppTaskDebug(void *p_arg)
+// {
+//     (void)p_arg;
+
+//     while (1) {
+//         OSTimeDlyHMSM(0, 0, 1, 0);
+//     }
+// }
 
 void Error_Handler(void)
 {

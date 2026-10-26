@@ -7,6 +7,88 @@ uint8_t already_init = 0;
 volatile uint8_t g_HmcAddressAck = 1;
 volatile uint8_t g_HmcIdentity[3] = {0xFF, 0xFF, 0xFF};
 
+volatile MPU6050_Offset_t g_MpuOffset = {0};
+volatile uint16_t g_MpuCalibrationCount = 0;
+volatile uint8_t g_MpuCalibrationActive = 0;
+
+static MPU6050_Offset_t mpu_calibration_sum = {0};
+static uint32_t mpu_calibration_last_tick = 0;
+static uint8_t mpu_read_failed = 0;
+
+void MPU6050_CalibrationStart(void)
+{
+    MPU6050_Offset_t zero = {0};
+
+    g_MpuCalibrationActive = 0;
+    g_MpuOffset = zero;
+    mpu_calibration_sum = zero;
+    g_MpuCalibrationCount = 0;
+    mpu_calibration_last_tick = HAL_GetTick() - 10u;
+    g_MpuCalibrationActive = 1;
+}
+
+uint8_t MPU6050_CalibrationStatus(void)
+{
+    return g_MpuCalibrationActive;
+}
+
+static int16_t MPU6050_SubtractOffset(int16_t raw, int32_t offset)
+{
+    int32_t value = (int32_t)raw - offset;
+
+    if (value > 32767) {
+        value = 32767;
+    } else if (value < -32768) {
+        value = -32768;
+    }
+    return (int16_t)value;
+}
+
+static void MPU6050_CalibrateSample(int16_t *ax, int16_t *ay, int16_t *az,
+                                   int16_t *gx, int16_t *gy, int16_t *gz)
+{
+    uint32_t now = HAL_GetTick();
+
+    if (mpu_read_failed != 0) {
+        return;
+    }
+
+    /* 当前输出速率为 100 Hz；校准样本至少间隔 10 ms，并使用未补偿原始值。 */
+    if (g_MpuCalibrationActive != 0 &&
+        (uint32_t)(now - mpu_calibration_last_tick) >= 10u) {
+        mpu_calibration_last_tick = now;
+        mpu_calibration_sum.ax += *ax;
+        mpu_calibration_sum.ay += *ay;
+        mpu_calibration_sum.az += *az;
+        mpu_calibration_sum.gx += *gx;
+        mpu_calibration_sum.gy += *gy;
+        mpu_calibration_sum.gz += *gz;
+        g_MpuCalibrationCount++;
+
+        if (g_MpuCalibrationCount == MPU6050_CALIBRATION_SAMPLES) {
+            g_MpuOffset.ax = mpu_calibration_sum.ax / (int32_t)MPU6050_CALIBRATION_SAMPLES;
+            g_MpuOffset.ay = mpu_calibration_sum.ay / (int32_t)MPU6050_CALIBRATION_SAMPLES;
+            /* 水平静止且传感器 +Z 朝上，保留重力，不把 Z 轴校准为零。 */
+            g_MpuOffset.az = mpu_calibration_sum.az / (int32_t)MPU6050_CALIBRATION_SAMPLES
+                             - MPU6050_ACCEL_1G_RAW;
+            g_MpuOffset.gx = mpu_calibration_sum.gx / (int32_t)MPU6050_CALIBRATION_SAMPLES;
+            g_MpuOffset.gy = mpu_calibration_sum.gy / (int32_t)MPU6050_CALIBRATION_SAMPLES;
+            g_MpuOffset.gz = mpu_calibration_sum.gz / (int32_t)MPU6050_CALIBRATION_SAMPLES;
+            g_MpuCalibrationActive = 0;
+        }
+    }
+
+    if (g_MpuCalibrationActive == 0 &&
+        g_MpuCalibrationCount == MPU6050_CALIBRATION_SAMPLES) {
+        *ax = MPU6050_SubtractOffset(*ax, g_MpuOffset.ax);
+        *ay = MPU6050_SubtractOffset(*ay, g_MpuOffset.ay);
+        *az = MPU6050_SubtractOffset(*az, g_MpuOffset.az);
+        *gx = MPU6050_SubtractOffset(*gx, g_MpuOffset.gx);
+        *gy = MPU6050_SubtractOffset(*gy, g_MpuOffset.gy);
+        *gz = MPU6050_SubtractOffset(*gz, g_MpuOffset.gz);
+    }
+}
+
 /*
  * MPU6050配置函数
  */
@@ -31,7 +113,7 @@ void MPU6050_Init(void) {
 	MPU6050_WriteReg(MPU6050_SMPLRT_DIV,0x09);
 	MPU6050_WriteReg(MPU6050_CONFIG,0x02);
 	MPU6050_WriteReg(MPU6050_GYRO_CONFIG,0x18);
-	MPU6050_WriteReg(MPU6050_ACCEL_CONFIG,0x18);
+        MPU6050_WriteReg(MPU6050_ACCEL_CONFIG,MPU6050_ACCEL_CONFIG_VALUE);
         /* 关闭 MPU 的 I2C 主机并开启旁路，让 STM32 直接访问辅助总线地磁计。 */
         MPU6050_WriteReg(MPU6050_USER_CTRL,0x00);
         MPU6050_WriteReg(MPU6050_INT_PIN_CFG,0x02);
@@ -41,13 +123,25 @@ uint8_t MPU6050_ReadReg(uint8_t RegAddr) {
 	uint8_t RecByte;
 	MyI2C_Start();
 	MyI2C_SendByte(MPU6050_ADDRESS);
-	MyI2C_ReceiveAck();
+        if (MyI2C_ReceiveAck() != 0) {
+                mpu_read_failed = 1;
+                MyI2C_Stop();
+                return 0xFF;
+        }
 	MyI2C_SendByte(RegAddr);
-	MyI2C_ReceiveAck();
+        if (MyI2C_ReceiveAck() != 0) {
+                mpu_read_failed = 1;
+                MyI2C_Stop();
+                return 0xFF;
+        }
 	
 	MyI2C_Start();
 	MyI2C_SendByte(MPU6050_ADDRESS | 0x01);
-	MyI2C_ReceiveAck();
+        if (MyI2C_ReceiveAck() != 0) {
+                mpu_read_failed = 1;
+                MyI2C_Stop();
+                return 0xFF;
+        }
 	RecByte = MyI2C_ReceiveByte();
 	MyI2C_SendAck(1);
 	MyI2C_Stop();
@@ -56,6 +150,7 @@ uint8_t MPU6050_ReadReg(uint8_t RegAddr) {
 
 void MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ) {
 	uint8_t High, Low;
+    mpu_read_failed = 0;
 	High = MPU6050_ReadReg(MPU6050_ACCEL_XOUT_H);
 	Low = MPU6050_ReadReg(MPU6050_ACCEL_XOUT_L);
 	*AccX = Low | (High << 8);
@@ -74,6 +169,8 @@ void MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX
 	High = MPU6050_ReadReg(MPU6050_GYRO_ZOUT_H);
 	Low = MPU6050_ReadReg(MPU6050_GYRO_ZOUT_L);
 	*GyroZ = Low | (High << 8);
+
+    MPU6050_CalibrateSample(AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
 }
 
 uint8_t MPU6050_GetId(void) {

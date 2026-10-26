@@ -2,6 +2,7 @@
 #include "GY86.h"
 #include "ReadPeripherals.h"
 #include "UART_Set.h"
+#include "ucos_ii.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -18,6 +19,7 @@ volatile MS5611_Read_t   g_MS5611   = {0};
 
 /* tick_counter: 每调用一次 Process() 自增 1，等价于 5ms 时间分辨率 */
 static uint32_t tick_counter = 0;
+static uint8_t mpu_calibration_pending = 1;
 
 /* ---- MS5611 非阻塞状态机 ---- */
 #if 0 /* 暂停气压计测量，保留代码以便恢复。 */
@@ -37,9 +39,6 @@ static uint32_t ms5611_d2_raw   = 0;
 static uint32_t ms5611_d1_raw   = 0;
 #endif
 
-/* ---- UART 调试输出分频: 每 DBG_DIV ticks 打印一次 ---- */
-#define DBG_DIV  200   /* 200 tick = 1s */
-
 /* ================================================================
  *  ReadPeripherals_Init
  * ================================================================ */
@@ -48,6 +47,7 @@ void ReadPeripherals_Init(void) {
     HMC5883L_Init();
     // MS561101BA_Init();    /* 暂停气压计初始化：复位 + 读取 PROM */
     tick_counter = 0;
+    mpu_calibration_pending = 1;
 }
 
 /* ================================================================
@@ -58,7 +58,18 @@ void ReadPeripherals_Init(void) {
  * ================================================================ */
 void ReadPeripherals_Process(void) {
     uint32_t now = tick_counter;
-    char buf[128];
+
+    /* 初始化后的第一次调用先完成校准，不发布校准期间的原始数据。 */
+    if (mpu_calibration_pending != 0) {
+        int16_t ax, ay, az, gx, gy, gz;
+
+        MPU6050_CalibrationStart();
+        while (MPU6050_CalibrationStatus() != 0) {
+            MPU6050_GetData(&ax, &ay, &az, &gx, &gy, &gz);
+            OSTimeDlyHMSM(0, 0, 0, 10);
+        }
+        mpu_calibration_pending = 0;
+    }
 
     /* ============================================================
      *  1. MPU6050 —— 每次调用均读取 (5ms = 200Hz)
@@ -75,14 +86,6 @@ void ReadPeripherals_Process(void) {
         g_MPU6050.gz   = gz;
         g_MPU6050.tick = now;
         g_MPU6050.fresh = 1;
-
-        /* 调试打印：约 1Hz */
-        if ((now % DBG_DIV) == 0) {
-            snprintf(buf, sizeof(buf),
-                     "MPU A:%d,%d,%d G:%d,%d,%d\r\n",
-                     ax, ay, az, gx, gy, gz);
-            HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
-        }
     }
 
     /* ============================================================
@@ -97,12 +100,6 @@ void ReadPeripherals_Process(void) {
         g_HMC5883L.mz   = mz;
         g_HMC5883L.tick = now;
         g_HMC5883L.fresh = 1;
-
-        if ((now % DBG_DIV) == 0) {
-            snprintf(buf, sizeof(buf),
-                     "HMC M:%d,%d,%d\r\n", mx, my, mz);
-            HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
-        }
     }
 
     #if 0 /* 暂停气压计采集、计算和串口输出。 */
@@ -143,13 +140,6 @@ void ReadPeripherals_Process(void) {
                     g_MS5611.altitude    = ms.altitude;
                     g_MS5611.tick        = now;
                     g_MS5611.fresh       = 1;
-
-                    if ((now % DBG_DIV) == 0) {
-                        snprintf(buf, sizeof(buf),
-                                 "BARO T:%.1fC P:%.0fPa A:%.1fm\r\n",
-                                 ms.temperature, ms.pressure, ms.altitude);
-                        HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
-                    }
                 }
                 ms5611_state = MS5611_IDLE;
             }
@@ -162,4 +152,31 @@ void ReadPeripherals_Process(void) {
     #endif
 
     tick_counter++;
+}
+
+void ReadPeripherals_Transmit(void)
+{
+    MPU6050_Read_t mpu;
+    HMC5883L_Read_t hmc;
+    OS_CPU_SR cpu_sr;
+    char buf[128];
+
+    /* 只在复制快照时保护共享数据，格式化和串口发送允许任务抢占。 */
+    OS_ENTER_CRITICAL();
+    mpu = g_MPU6050;
+    hmc = g_HMC5883L;
+    OS_EXIT_CRITICAL();
+
+    if (mpu.fresh != 0) {
+        snprintf(buf, sizeof(buf),
+                 "MPU A:%d,%d,%d G:%d,%d,%d\r\n",
+                 mpu.ax, mpu.ay, mpu.az, mpu.gx, mpu.gy, mpu.gz);
+        HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)strlen(buf), 1000);
+    }
+
+    if (hmc.fresh != 0) {
+        snprintf(buf, sizeof(buf),
+                 "HMC M:%d,%d,%d\r\n", hmc.mx, hmc.my, hmc.mz);
+        HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)strlen(buf), 1000);
+    }
 }
