@@ -1,6 +1,8 @@
 #ifndef __DELAY_H
 #define __DELAY_H
 
-void Timer_Delay_us(uint8_t xus);
+#include <stdint.h>
+
+void Timer_Delay_us(uint16_t xus);
 
 #endif

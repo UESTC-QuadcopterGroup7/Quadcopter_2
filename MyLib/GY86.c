@@ -110,8 +110,12 @@ void MPU6050_Init(void) {
 	}
 	MPU6050_WriteReg(MPU6050_PWR_MGMT_1,0x01);
 	MPU6050_WriteReg(MPU6050_PWR_MGMT_2,0x00);
-	MPU6050_WriteReg(MPU6050_SMPLRT_DIV,0x09);
-	MPU6050_WriteReg(MPU6050_CONFIG,0x02);
+        /* 采样率：1kHz / (1 + SMPLRT_DIV)。0x04 → 200Hz，
+         * 原来 0x09 只有 100Hz，光是等下一次采样就带来 ~5ms 平均延迟。 */
+	MPU6050_WriteReg(MPU6050_SMPLRT_DIV,0x04);
+        /* 数字低通：0x01 = 184Hz 带宽（群延迟 ~1.9ms），
+         * 原来 0x02 = 94Hz（~2.9ms）。想回到更平滑的曲线就改回 0x02。 */
+	MPU6050_WriteReg(MPU6050_CONFIG,0x01);
 	MPU6050_WriteReg(MPU6050_GYRO_CONFIG,0x18);
         MPU6050_WriteReg(MPU6050_ACCEL_CONFIG,MPU6050_ACCEL_CONFIG_VALUE);
         /* 关闭 MPU 的 I2C 主机并开启旁路，让 STM32 直接访问辅助总线地磁计。 */
@@ -148,27 +152,62 @@ uint8_t MPU6050_ReadReg(uint8_t RegAddr) {
 	return RecByte;
 }
 
+/*
+ * 从 RegAddr 开始连续读 len 个字节（MPU6050 寄存器地址自动递增）。
+ *
+ * 原来是每个寄存器单独起一次 I2C 事务，加速度+陀螺共 12 次；
+ * 在软件 I2C 上每次事务都要几百微秒，累计十几毫秒，直接把采样率压到 40Hz。
+ * 改用突发读后整帧只要一次事务。
+ */
+static void MPU6050_ReadBurst(uint8_t RegAddr, uint8_t *buf, uint8_t len)
+{
+	uint8_t i;
+
+	MyI2C_Start();
+	MyI2C_SendByte(MPU6050_ADDRESS);
+	if (MyI2C_ReceiveAck() != 0) {
+		mpu_read_failed = 1;
+		MyI2C_Stop();
+		return;
+	}
+	MyI2C_SendByte(RegAddr);
+	if (MyI2C_ReceiveAck() != 0) {
+		mpu_read_failed = 1;
+		MyI2C_Stop();
+		return;
+	}
+
+	MyI2C_Start();
+	MyI2C_SendByte(MPU6050_ADDRESS | 0x01);
+	if (MyI2C_ReceiveAck() != 0) {
+		mpu_read_failed = 1;
+		MyI2C_Stop();
+		return;
+	}
+
+	for (i = 0; i < len; i++) {
+		buf[i] = MyI2C_ReceiveByte();
+		/* 最后一个字节回 NACK，其余回 ACK */
+		MyI2C_SendAck((uint8_t)((i + 1u == len) ? 1u : 0u));
+	}
+	MyI2C_Stop();
+}
+
 void MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ) {
-	uint8_t High, Low;
+	uint8_t raw[14];
+
     mpu_read_failed = 0;
-	High = MPU6050_ReadReg(MPU6050_ACCEL_XOUT_H);
-	Low = MPU6050_ReadReg(MPU6050_ACCEL_XOUT_L);
-	*AccX = Low | (High << 8);
-	High = MPU6050_ReadReg(MPU6050_ACCEL_YOUT_H);
-	Low = MPU6050_ReadReg(MPU6050_ACCEL_YOUT_L);
-	*AccY = Low | (High << 8);
-	High = MPU6050_ReadReg(MPU6050_ACCEL_ZOUT_H);
-	Low = MPU6050_ReadReg(MPU6050_ACCEL_ZOUT_L);
-	*AccZ = Low | (High << 8);
-	High = MPU6050_ReadReg(MPU6050_GYRO_XOUT_H);
-	Low = MPU6050_ReadReg(MPU6050_GYRO_XOUT_L);
-	*GyroX = Low | (High << 8);
-	High = MPU6050_ReadReg(MPU6050_GYRO_YOUT_H);
-	Low = MPU6050_ReadReg(MPU6050_GYRO_YOUT_L);
-	*GyroY = Low | (High << 8);	
-	High = MPU6050_ReadReg(MPU6050_GYRO_ZOUT_H);
-	Low = MPU6050_ReadReg(MPU6050_GYRO_ZOUT_L);
-	*GyroZ = Low | (High << 8);
+
+	/* 0x3B ~ 0x48：加速度 6 字节 + 温度 2 字节 + 陀螺 6 字节 */
+	MPU6050_ReadBurst(MPU6050_ACCEL_XOUT_H, raw, 14);
+
+	*AccX  = (int16_t)(((uint16_t)raw[0]  << 8) | raw[1]);
+	*AccY  = (int16_t)(((uint16_t)raw[2]  << 8) | raw[3]);
+	*AccZ  = (int16_t)(((uint16_t)raw[4]  << 8) | raw[5]);
+	/* raw[6]、raw[7] 是温度，当前不使用 */
+	*GyroX = (int16_t)(((uint16_t)raw[8]  << 8) | raw[9]);
+	*GyroY = (int16_t)(((uint16_t)raw[10] << 8) | raw[11]);
+	*GyroZ = (int16_t)(((uint16_t)raw[12] << 8) | raw[13]);
 
     MPU6050_CalibrateSample(AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
 }
@@ -228,17 +267,45 @@ uint8_t HMC5883L_ReadReg(uint8_t RegAddr) {
 	return RecByte;
 }
 
+static void HMC5883L_ReadBurst(uint8_t RegAddr, uint8_t *buf, uint8_t len)
+{
+	uint8_t i;
+
+	MyI2C_Start();
+	MyI2C_SendByte(HMC5883L_ADDRESS);
+	if (MyI2C_ReceiveAck() != 0) {
+		MyI2C_Stop();
+		return;
+	}
+	MyI2C_SendByte(RegAddr);
+	if (MyI2C_ReceiveAck() != 0) {
+		MyI2C_Stop();
+		return;
+	}
+
+	MyI2C_Start();
+	MyI2C_SendByte(HMC5883L_ADDRESS | 0x01);
+	if (MyI2C_ReceiveAck() != 0) {
+		MyI2C_Stop();
+		return;
+	}
+
+	for (i = 0; i < len; i++) {
+		buf[i] = MyI2C_ReceiveByte();
+		MyI2C_SendAck((uint8_t)((i + 1u == len) ? 1u : 0u));
+	}
+	MyI2C_Stop();
+}
+
 void HMC5883L_GetData(int16_t* X, int16_t* Y, int16_t* Z) {
-    uint8_t High, Low;
-    High = HMC5883L_ReadReg(HMC5883L_XOUT_MSB);
-    Low = HMC5883L_ReadReg(HMC5883L_XOUT_LSB);
-    *X = Low | (High << 8);
-    High = HMC5883L_ReadReg(HMC5883L_YOUT_MSB);
-    Low = HMC5883L_ReadReg(HMC5883L_YOUT_LSB);
-    *Y = Low | (High << 8);
-    High = HMC5883L_ReadReg(HMC5883L_ZOUT_MSB);
-    Low = HMC5883L_ReadReg(HMC5883L_ZOUT_LSB);
-    *Z = Low | (High << 8);
+	uint8_t raw[6];
+
+	HMC5883L_ReadBurst(HMC5883L_XOUT_MSB, raw, 6);
+
+	/* HMC5883L 的输出顺序是 X、Z、Y —— 芯片固有顺序，不是笔误 */
+	*X = (int16_t)(((uint16_t)raw[0] << 8) | raw[1]);
+	*Z = (int16_t)(((uint16_t)raw[2] << 8) | raw[3]);
+	*Y = (int16_t)(((uint16_t)raw[4] << 8) | raw[5]);
 }
 
 /*

@@ -145,7 +145,7 @@ static void APPTaskCom(void *p_arg)
 
     while (1) {
         ReadPeripherals_Transmit();
-        OSTimeDlyHMSM(0, 0, 0, 10);
+        OSTimeDlyHMSM(0, 0, 0, 5);
     }
 }
 

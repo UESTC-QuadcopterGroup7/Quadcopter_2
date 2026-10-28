@@ -5,6 +5,7 @@
  *  内部工具
  * ================================================================ */
 
+/* 把 value 限制在 [min, max] 区间内。 */
 static float Quaternion_Clampf(float value, float min, float max)
 {
     if (value < min) {
@@ -20,6 +21,7 @@ static float Quaternion_Clampf(float value, float min, float max)
  *  构造
  * ================================================================ */
 
+/* 将四元数置为单位四元数 (1,0,0,0)，表示不旋转。 */
 void Quaternion_Identity(Quaternion_t *q)
 {
     if (q == 0) {
@@ -31,6 +33,7 @@ void Quaternion_Identity(Quaternion_t *q)
     q->z = 0.0f;
 }
 
+/* 由旋转轴 (axis_x, axis_y, axis_z) 和旋转角 angle 构造四元数。 */
 void Quaternion_FromAxisAngle(Quaternion_t *q, float axis_x, float axis_y, float axis_z, float angle)
 {
     float norm;
@@ -56,6 +59,7 @@ void Quaternion_FromAxisAngle(Quaternion_t *q, float axis_x, float axis_y, float
     q->z = axis_z * s;
 }
 
+/* 由欧拉角 (roll, pitch, yaw) 构造四元数。 */
 void Quaternion_FromEuler(Quaternion_t *q, float roll, float pitch, float yaw)
 {
     Quaternion_t qx;
@@ -96,6 +100,7 @@ void Quaternion_FromEuler(Quaternion_t *q, float roll, float pitch, float yaw)
     (void)Quaternion_Normalize(q);
 }
 
+/* 构造把向量 from 旋转到向量 to 的四元数。 */
 void Quaternion_FromTwoVectors(Quaternion_t *q, const Vector3f_t *from, const Vector3f_t *to)
 {
     Vector3f_t f;
@@ -153,6 +158,7 @@ void Quaternion_FromTwoVectors(Quaternion_t *q, const Vector3f_t *from, const Ve
     (void)Quaternion_Normalize(q);
 }
 
+/* 由 3x3 旋转矩阵（行优先，m[9]）构造四元数。 */
 void Quaternion_FromRotationMatrix(Quaternion_t *q, const float m[9])
 {
     float trace;
@@ -197,6 +203,7 @@ void Quaternion_FromRotationMatrix(Quaternion_t *q, const float m[9])
  *  转换
  * ================================================================ */
 
+/* 由四元数反解出欧拉角 (roll, pitch, yaw)，单位为弧度。 */
 void Quaternion_ToEuler(const Quaternion_t *q, EulerAngles_t *euler)
 {
     float r00;
@@ -221,6 +228,7 @@ void Quaternion_ToEuler(const Quaternion_t *q, EulerAngles_t *euler)
     euler->yaw   = atan2f(-r10, r00);
 }
 
+/* 由四元数生成 3x3 旋转矩阵（行优先，m[9]）。 */
 void Quaternion_ToRotationMatrix(const Quaternion_t *q, float m[9])
 {
     float xx;
@@ -264,6 +272,7 @@ void Quaternion_ToRotationMatrix(const Quaternion_t *q, float m[9])
  *  基本运算
  * ================================================================ */
 
+/* 四元数乘法（Hamilton 积）：out = a ⊗ b。 */
 void Quaternion_Multiply(Quaternion_t *out, const Quaternion_t *a, const Quaternion_t *b)
 {
     Quaternion_t result;
@@ -281,6 +290,7 @@ void Quaternion_Multiply(Quaternion_t *out, const Quaternion_t *a, const Quatern
     *out = result;
 }
 
+/* 求共轭四元数 out = q*（实部不变，虚部取反）。 */
 void Quaternion_Conjugate(Quaternion_t *out, const Quaternion_t *q)
 {
     if (out == 0 || q == 0) {
@@ -293,6 +303,7 @@ void Quaternion_Conjugate(Quaternion_t *out, const Quaternion_t *q)
     out->z = -q->z;
 }
 
+/* 求四元数的逆 out = q⁻¹（单位四元数下与共轭相同）。 */
 void Quaternion_Inverse(Quaternion_t *out, const Quaternion_t *q)
 {
     float norm_sq;
@@ -313,6 +324,7 @@ void Quaternion_Inverse(Quaternion_t *out, const Quaternion_t *q)
     out->z = -q->z / norm_sq;
 }
 
+/* 求四元数的模长。 */
 float Quaternion_Norm(const Quaternion_t *q)
 {
     if (q == 0) {
@@ -321,6 +333,7 @@ float Quaternion_Norm(const Quaternion_t *q)
     return sqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
 }
 
+/* 把四元数归一化为单位四元数；成功返回 1，模长为 0 或 NaN 返回 0。 */
 uint8_t Quaternion_Normalize(Quaternion_t *q)
 {
     float norm;
@@ -344,6 +357,7 @@ uint8_t Quaternion_Normalize(Quaternion_t *q)
     return 1;
 }
 
+/* 求两个四元数的点积。 */
 float Quaternion_Dot(const Quaternion_t *a, const Quaternion_t *b)
 {
     if (a == 0 || b == 0) {
@@ -352,6 +366,7 @@ float Quaternion_Dot(const Quaternion_t *a, const Quaternion_t *b)
     return a->w * b->w + a->x * b->x + a->y * b->y + a->z * b->z;
 }
 
+/* 求两个四元数所代表旋转之间的夹角（弧度）。 */
 float Quaternion_AngleBetween(const Quaternion_t *a, const Quaternion_t *b)
 {
     float dot;
@@ -361,6 +376,7 @@ float Quaternion_AngleBetween(const Quaternion_t *a, const Quaternion_t *b)
     return 2.0f * acosf(dot);
 }
 
+/* 球面线性插值：取 a 到 b 最短弧上参数 t 处的四元数。 */
 void Quaternion_Slerp(Quaternion_t *out, const Quaternion_t *a, const Quaternion_t *b, float t)
 {
     Quaternion_t target;
@@ -412,6 +428,7 @@ void Quaternion_Slerp(Quaternion_t *out, const Quaternion_t *a, const Quaternion
  *  向量旋转
  * ================================================================ */
 
+/* 用四元数旋转向量：out = q ⊗ (0,v) ⊗ q*。 */
 void Quaternion_RotateVector(Vector3f_t *out, const Quaternion_t *q, const Vector3f_t *v)
 {
     Vector3f_t u;
@@ -445,6 +462,7 @@ void Quaternion_RotateVector(Vector3f_t *out, const Quaternion_t *q, const Vecto
     out->z = v->z + s * t.z + c.z;
 }
 
+/* 用四元数的逆旋转向量，是 Quaternion_RotateVector 的反向操作。 */
 void Quaternion_RotateVectorInverse(Vector3f_t *out, const Quaternion_t *q, const Vector3f_t *v)
 {
     Quaternion_t conjugate;
@@ -461,6 +479,7 @@ void Quaternion_RotateVectorInverse(Vector3f_t *out, const Quaternion_t *q, cons
  *  与角速度相关的积分
  * ================================================================ */
 
+/* 由机体系角速度计算四元数导数 q̇ = ½ · q ⊗ (0, ω)。 */
 void Quaternion_Derivative(Quaternion_t *qdot, const Quaternion_t *q, float wx, float wy, float wz)
 {
     Quaternion_t omega;
@@ -482,6 +501,7 @@ void Quaternion_Derivative(Quaternion_t *qdot, const Quaternion_t *q, float wx, 
     qdot->z *= 0.5f;
 }
 
+/* 用机体系角速度在 dt 时间内积分，增量右乘更新四元数。 */
 void Quaternion_IntegrateBodyRate(Quaternion_t *q, float wx, float wy, float wz, float dt)
 {
     Quaternion_t delta;
@@ -520,6 +540,7 @@ void Quaternion_IntegrateBodyRate(Quaternion_t *q, float wx, float wy, float wz,
  *  三维向量工具
  * ================================================================ */
 
+/* 求三维向量的长度（模）。 */
 float Vector3f_Length(const Vector3f_t *v)
 {
     if (v == 0) {
@@ -528,6 +549,7 @@ float Vector3f_Length(const Vector3f_t *v)
     return sqrtf(v->x * v->x + v->y * v->y + v->z * v->z);
 }
 
+/* 求两个三维向量的点积。 */
 float Vector3f_Dot(const Vector3f_t *a, const Vector3f_t *b)
 {
     if (a == 0 || b == 0) {
@@ -536,6 +558,7 @@ float Vector3f_Dot(const Vector3f_t *a, const Vector3f_t *b)
     return a->x * b->x + a->y * b->y + a->z * b->z;
 }
 
+/* 求两个三维向量的叉积 out = a × b。 */
 void Vector3f_Cross(Vector3f_t *out, const Vector3f_t *a, const Vector3f_t *b)
 {
     Vector3f_t result;
@@ -551,6 +574,7 @@ void Vector3f_Cross(Vector3f_t *out, const Vector3f_t *a, const Vector3f_t *b)
     *out = result;
 }
 
+/* 把三维向量归一化为单位向量；成功返回 1，零向量返回 0。 */
 uint8_t Vector3f_Normalize(Vector3f_t *v)
 {
     float norm;

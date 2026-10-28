@@ -2,6 +2,7 @@
 #include "GY86.h"
 #include "ReadPeripherals.h"
 #include "Attitude.h"
+#include "ANO.h"
 #include "UART_Set.h"
 #include "ucos_ii.h"
 #include <stdio.h>
@@ -23,14 +24,22 @@ volatile Attitude_Read_t g_Attitude = {0};
 static uint32_t tick_counter = 0;
 static uint8_t mpu_calibration_pending = 1;
 
+/* ---- 发送节奏 ---- */
+
+/* 通信任务每 10ms 调用一次 Transmit；ANO_TICK_DIV = 1 → 每拍都发姿态帧（100Hz）。 */
+#define ANO_TICK_DIV      1u
+
+/* MPU6050 陀螺量程 ±2000°/s 对应的灵敏度 */
+#define MPU6050_GYRO_LSB_PER_DPS 16.4f
+
 /* ---- 姿态解算状态 ---- */
 static Attitude_t s_attitude;
-static uint32_t   s_attitude_last_ms = 0;
+static uint32_t   s_attitude_last_cyc = 0;
 static uint8_t    s_attitude_ready = 0;
-static uint8_t    s_attitude_tx_div = 0;
-
-/* 通信任务每 10ms 调用一次 Transmit，每 5 次发送一帧姿态，即约 20Hz。 */
-#define ATTITUDE_TX_DIV   5u
+static uint8_t    s_hmc_div = 0;
+static uint8_t    s_frame_div = 0;
+static uint8_t    s_motion_div = 0;
+static uint8_t    s_env_div = 0;
 
 /* ---- MS5611 非阻塞状态机 ---- */
 #if 0 /* 暂停气压计测量，保留代码以便恢复。 */
@@ -59,6 +68,15 @@ void ReadPeripherals_Init(void) {
     // MS561101BA_Init();    /* 暂停气压计初始化：复位 + 读取 PROM */
     tick_counter = 0;
     mpu_calibration_pending = 1;
+
+    /*
+     * 打开 DWT 周期计数器，用来测两次采样的间隔。
+     * HAL_GetTick() 只有 1ms 分辨率，采样周期降到 2ms 左右以后，
+     * 用它算 dt 的误差会到 25%，积分出来的角度会抖。
+     */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
 /* ================================================================
@@ -105,7 +123,10 @@ void ReadPeripherals_Process(void) {
     }
 
     /* ============================================================
-     *  1. MPU6050 —— 每次调用均读取 (5ms = 200Hz)
+     *  1. MPU6050 —— 每次调用均读取
+     *
+     *  I2C 提速 + 突发读之后，一次读取约 1ms，加上任务延时循环约 2ms，
+     *  实际采样率接近 400Hz（MPU 自身输出 200Hz，多读的是同一份数据）。
      * ============================================================ */
     {
         int16_t ax, ay, az, gx, gy, gz;
@@ -122,10 +143,16 @@ void ReadPeripherals_Process(void) {
     }
 
     /* ============================================================
-     *  2. HMC5883L —— 与 MPU6050 一样，每次调用均读取
+     *  2. HMC5883L —— 每 4 次调用读一次
+     *
+     *  磁力计本身输出率只有 15Hz（CONFIG_A 设的是 8 次平均），
+     *  读得再快也拿不到新数据，却要多花一次 I2C 事务的时间，
+     *  所以降到约 1/4 采样率。
      * ============================================================ */
-    {
+    if (++s_hmc_div >= 4u) {
         int16_t mx, my, mz;
+
+        s_hmc_div = 0;
         HMC5883L_GetData(&mx, &my, &mz);
 
         g_HMC5883L.mx   = mx;
@@ -138,15 +165,15 @@ void ReadPeripherals_Process(void) {
     /* ============================================================
      *  3. 姿态解算 —— Madgwick 梯度下降滤波（四元数）
      *
-     *  输入是已做零偏补偿的原始计数，dt 取自 HAL_GetTick()，因此采样周期
-     *  不必固定；代价是 dt 只有 1ms 分辨率。滤波器内部会限幅 dt。
+     *  输入是已做零偏补偿的原始计数。dt 取自 DWT 周期计数器（微秒级），
+     *  采样周期不固定也不影响积分精度；滤波器内部还会限幅 dt。
      * ============================================================ */
     {
         int16_t accel[3];
         int16_t gyro[3];
         int16_t mag[3];
         const int16_t *mag_ptr = 0;
-        uint32_t now_ms = HAL_GetTick();
+        uint32_t now_cyc = DWT->CYCCNT;
 
         accel[0] = g_MPU6050.ax;
         accel[1] = g_MPU6050.ay;
@@ -177,14 +204,14 @@ void ReadPeripherals_Process(void) {
                     flags |= ATTITUDE_FLAG_MAG;
                 }
                 s_attitude_ready = 1;
-                s_attitude_last_ms = now_ms;
+                s_attitude_last_cyc = now_cyc;
                 PublishAttitude(&s_attitude, now, flags);
             }
         } else {
-            float dt = (float)(uint32_t)(now_ms - s_attitude_last_ms) * 0.001f;
+            float dt = (float)(uint32_t)(now_cyc - s_attitude_last_cyc) / (float)SystemCoreClock;
             uint8_t flags = Attitude_UpdateRaw(&s_attitude, accel, gyro, mag_ptr, dt);
 
-            s_attitude_last_ms = now_ms;
+            s_attitude_last_cyc = now_cyc;
             if (flags != 0) {
                 PublishAttitude(&s_attitude, now, flags);
             }
@@ -249,7 +276,9 @@ void ReadPeripherals_Transmit(void)
     HMC5883L_Read_t hmc;
     Attitude_Read_t att;
     OS_CPU_SR cpu_sr;
-    char buf[128];
+    float acc_ms2[3];
+    float gyr_dps[3];
+    int16_t mag[3];
 
     /* 只在复制快照时保护共享数据，格式化和串口发送允许任务抢占。 */
     OS_ENTER_CRITICAL();
@@ -258,6 +287,51 @@ void ReadPeripherals_Transmit(void)
     att = g_Attitude;
     OS_EXIT_CRITICAL();
 
+    /* ---- 飞控固定帧 0x01 / 0x02 / 0x03 ----
+     *
+     * 这三帧喂的是上位机波形页里 FC_ACC_* / FC_GYR_* / FC_MAG_* / FC_ATT_*
+     * 那些通道（通道名和顺序都是协议写死的），同时也是“飞控状态”页
+     * 3D 模型、罗盘和 ROL/PIT/YAW 的数据源。
+     *
+     * 注意：这里不依赖 att.fresh，传感器一上电就开始发，避免没有姿态时
+     * 整个串口静默。
+     */
+    if (++s_frame_div >= ANO_TICK_DIV) {
+        s_frame_div = 0;
+
+        /* 姿态帧优先：3D 模型和 ROL/PIT/YAW 全靠它，100Hz。 */
+        if (att.fresh != 0) {
+            ANO_SendFC_Attitude(att.roll, att.pitch, att.yaw);
+        }
+
+        /* 运动帧 50Hz：加速度 / 角速度，只喂波形，不需要那么快。 */
+        if (++s_motion_div >= 2u) {
+            s_motion_div = 0;
+
+            /* ±16g 档 2048 LSB/g；±2000°/s 档 16.4 LSB/(°/s) */
+            acc_ms2[0] = (float)mpu.ax / (float)MPU6050_ACCEL_1G_RAW * 9.80665f;
+            acc_ms2[1] = (float)mpu.ay / (float)MPU6050_ACCEL_1G_RAW * 9.80665f;
+            acc_ms2[2] = (float)mpu.az / (float)MPU6050_ACCEL_1G_RAW * 9.80665f;
+
+            gyr_dps[0] = (float)mpu.gx / MPU6050_GYRO_LSB_PER_DPS;
+            gyr_dps[1] = (float)mpu.gy / MPU6050_GYRO_LSB_PER_DPS;
+            gyr_dps[2] = (float)mpu.gz / MPU6050_GYRO_LSB_PER_DPS;
+
+            ANO_SendFC_AccGyr(acc_ms2, gyr_dps, 0u);
+        }
+
+        /* 环境帧 25Hz：磁力变化慢，气压高度暂未启用。 */
+        if (++s_env_div >= 4u) {
+            s_env_div = 0;
+            mag[0] = hmc.mx;
+            mag[1] = hmc.my;
+            mag[2] = hmc.mz;
+            ANO_SendFC_MagBaro(mag, 0.0f, 0.0f, 0u,
+                               (uint8_t)((g_HmcAddressAck == 0) ? 1u : 0u));
+        }
+    }
+
+#if 0 /* 保留原始文本输出。 */
     if (mpu.fresh != 0) {
         snprintf(buf, sizeof(buf),
                  "MPU A:%d,%d,%d G:%d,%d,%d\r\n",
@@ -284,4 +358,5 @@ void ReadPeripherals_Transmit(void)
             HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)strlen(buf), 1000);
         }
     }
+#endif
 }
