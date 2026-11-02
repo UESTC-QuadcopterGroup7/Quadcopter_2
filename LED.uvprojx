@@ -1081,6 +1081,16 @@
               <FilePath>.\MyLib\GY86.h</FilePath>
             </File>
             <File>
+              <FileName>AccelCalibration.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\MyLib\AccelCalibration.c</FilePath>
+            </File>
+            <File>
+              <FileName>AccelCalibration.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\AccelCalibration.h</FilePath>
+            </File>
+            <File>
               <FileName>OLED.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\MyLib\OLED.c</FilePath>

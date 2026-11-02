@@ -212,6 +212,38 @@ void MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX
     MPU6050_CalibrateSample(AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
 }
 
+uint8_t MPU6050_GetRawData(int16_t* AccX, int16_t* AccY, int16_t* AccZ,
+                         int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ)
+{
+    uint8_t frame[14];
+    uint8_t i;
+
+    if (!AccX || !AccY || !AccZ || !GyroX || !GyroY || !GyroZ) {
+        return 0;
+    }
+    MyI2C_Start();
+    MyI2C_SendByte(MPU6050_ADDRESS);
+    if (MyI2C_ReceiveAck() != 0) { MyI2C_Stop(); return 0; }
+    MyI2C_SendByte(MPU6050_ACCEL_XOUT_H);
+    if (MyI2C_ReceiveAck() != 0) { MyI2C_Stop(); return 0; }
+    MyI2C_Start();
+    MyI2C_SendByte(MPU6050_ADDRESS | 0x01u);
+    if (MyI2C_ReceiveAck() != 0) { MyI2C_Stop(); return 0; }
+    for (i = 0; i < sizeof(frame); ++i) {
+        frame[i] = MyI2C_ReceiveByte();
+        MyI2C_SendAck(i == sizeof(frame) - 1u ? 1u : 0u);
+    }
+    MyI2C_Stop();
+    *AccX = (int16_t)(((uint16_t)frame[0] << 8) | frame[1]);
+    *AccY = (int16_t)(((uint16_t)frame[2] << 8) | frame[3]);
+    *AccZ = (int16_t)(((uint16_t)frame[4] << 8) | frame[5]);
+    /* 下标 6、7 的字节为温度数据，陀螺仪数据从下标 8 开始。 */
+    *GyroX = (int16_t)(((uint16_t)frame[8] << 8) | frame[9]);
+    *GyroY = (int16_t)(((uint16_t)frame[10] << 8) | frame[11]);
+    *GyroZ = (int16_t)(((uint16_t)frame[12] << 8) | frame[13]);
+    return 1;
+}
+
 uint8_t MPU6050_GetId(void) {
 	return MPU6050_ReadReg(MPU6050_WHO_AM_I);
 }
