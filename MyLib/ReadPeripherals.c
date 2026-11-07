@@ -2,11 +2,19 @@
 #include "GY86.h"
 #include "ReadPeripherals.h"
 #include "Attitude.h"
+#include "AccelCalibration.h"
 #include "ANO.h"
 #include "UART_Set.h"
 #include "ucos_ii.h"
+#include <float.h>
 #include <stdio.h>
 #include <string.h>
+
+#if ACCEL_CAL_MODE == 0 && ACCEL_CAL_PARAMS_VALID == 1
+#if ACCEL_CAL_PARAMS_1G_RAW != MPU6050_ACCEL_1G_RAW
+#error Accelerometer calibration does not match the configured range
+#endif
+#endif
 
 /* ================================================================
  *  跨任务共享的传感器数据
@@ -41,6 +49,155 @@ static uint8_t    s_frame_div = 0;
 static uint8_t    s_motion_div = 0;
 static uint8_t    s_env_div = 0;
 
+#if ACCEL_CAL_MODE == 0 && ACCEL_CAL_PARAMS_VALID == 1
+static int16_t AccelCal_ClampRaw(float value)
+{
+    if (value >= 32767.0f) {
+        return 32767;
+    }
+    if (value <= -32768.0f) {
+        return -32768;
+    }
+    return (int16_t)(value >= 0.0f ? value + 0.5f : value - 0.5f);
+}
+#endif
+
+#if ACCEL_CAL_MODE == 1
+#define ACCEL_CAL_SAMPLES_PER_POSE 100u
+#define ACCEL_CAL_SAMPLE_INTERVAL_MS 10u
+#define ACCEL_CAL_MAX_SPAN_RAW (MPU6050_ACCEL_1G_RAW / 10)
+#define ACCEL_CAL_MAX_GYRO_RAW 164
+#define ACCEL_CAL_POSE_MASK_ALL 0x3fu
+#define ACCEL_CAL_STATE_COLLECTING 1u
+#define ACCEL_CAL_STATE_SOLVED 2u
+#define ACCEL_CAL_STATE_ERROR 3u
+
+/* F1 浮点通道：状态、姿态掩码、当前样本数、错误码、三轴比例。 */
+static AccelCal_Data s_accel_cal_data;
+static AccelCal_Result s_accel_cal_result;
+static volatile uint8_t s_accel_cal_state;
+static volatile uint8_t s_accel_cal_mask;
+static volatile uint8_t s_accel_cal_error;
+static volatile float s_accel_cal_output[3];
+static int8_t s_accel_cal_pose = -1;
+static volatile uint16_t s_accel_cal_count;
+static int32_t s_accel_cal_sum[3];
+static int16_t s_accel_cal_min[3];
+static int16_t s_accel_cal_max[3];
+static uint32_t s_accel_cal_last_ms;
+static uint8_t s_accel_cal_tx_div;
+
+/* 识别接近单轴正负 1g 的六个姿态，顺序为 +X、-X、+Y、-Y、+Z、-Z。 */
+static int8_t AccelCal_DetectPose(const int16_t accel[3])
+{
+    int32_t magnitude[3];
+    uint8_t axis;
+    uint8_t largest = 0u;
+
+    for (axis = 0u; axis < 3u; ++axis) {
+        magnitude[axis] = accel[axis] < 0 ? -(int32_t)accel[axis] : (int32_t)accel[axis];
+        if (magnitude[axis] > magnitude[largest]) {
+            largest = axis;
+        }
+    }
+    if (magnitude[largest] < MPU6050_ACCEL_1G_RAW * 3 / 4 ||
+        magnitude[largest] > MPU6050_ACCEL_1G_RAW * 5 / 4) {
+        return -1;
+    }
+    for (axis = 0u; axis < 3u; ++axis) {
+        if (axis != largest && magnitude[axis] > MPU6050_ACCEL_1G_RAW / 2) {
+            return -1;
+        }
+    }
+    return (int8_t)(2u * largest + (accel[largest] < 0 ? 1u : 0u));
+}
+
+static void AccelCal_CaptureSample(void)
+{
+    int16_t accel[3], gyro[3];
+    uint32_t now;
+    uint8_t axis;
+    int8_t pose;
+    AccelCal_Status result;
+
+    if (s_accel_cal_state != ACCEL_CAL_STATE_COLLECTING) {
+        return;
+    }
+    now = HAL_GetTick();
+    if ((uint32_t)(now - s_accel_cal_last_ms) < ACCEL_CAL_SAMPLE_INTERVAL_MS) {
+        return;
+    }
+    s_accel_cal_last_ms = now;
+    if (MPU6050_GetRawData(&accel[0], &accel[1], &accel[2],
+                           &gyro[0], &gyro[1], &gyro[2]) == 0u) {
+        s_accel_cal_error = 1u;
+        s_accel_cal_count = 0u;
+        s_accel_cal_pose = -1;
+        return;
+    }
+    pose = AccelCal_DetectPose(accel);
+    if (pose < 0 || (s_accel_cal_mask & (uint8_t)(1u << pose)) != 0u) {
+        s_accel_cal_count = 0u;
+        s_accel_cal_pose = -1;
+        return;
+    }
+    for (axis = 0u; axis < 3u; ++axis) {
+        if (gyro[axis] > ACCEL_CAL_MAX_GYRO_RAW || gyro[axis] < -ACCEL_CAL_MAX_GYRO_RAW ||
+            accel[axis] == 32767 || accel[axis] == -32768) {
+            s_accel_cal_count = 0u;
+            s_accel_cal_pose = -1;
+            return;
+        }
+    }
+    if (pose != s_accel_cal_pose) {
+        s_accel_cal_count = 0u;
+        s_accel_cal_pose = pose;
+        memset(s_accel_cal_sum, 0, sizeof(s_accel_cal_sum));
+    }
+    for (axis = 0u; axis < 3u; ++axis) {
+        if (s_accel_cal_count == 0u) {
+            s_accel_cal_min[axis] = accel[axis];
+            s_accel_cal_max[axis] = accel[axis];
+        } else {
+            if (accel[axis] < s_accel_cal_min[axis]) { s_accel_cal_min[axis] = accel[axis]; }
+            if (accel[axis] > s_accel_cal_max[axis]) { s_accel_cal_max[axis] = accel[axis]; }
+        }
+        if ((int32_t)s_accel_cal_max[axis] - s_accel_cal_min[axis] > ACCEL_CAL_MAX_SPAN_RAW) {
+            s_accel_cal_count = 0u;
+            s_accel_cal_pose = -1;
+            return;
+        }
+        s_accel_cal_sum[axis] += accel[axis];
+    }
+    s_accel_cal_error = 0u;
+    if (++s_accel_cal_count < ACCEL_CAL_SAMPLES_PER_POSE) {
+        return;
+    }
+    result = AccelCal_AddPose(&s_accel_cal_data,
+                             (float)s_accel_cal_sum[0] / ACCEL_CAL_SAMPLES_PER_POSE,
+                             (float)s_accel_cal_sum[1] / ACCEL_CAL_SAMPLES_PER_POSE,
+                             (float)s_accel_cal_sum[2] / ACCEL_CAL_SAMPLES_PER_POSE);
+    if (result != ACCEL_CAL_OK) {
+        s_accel_cal_error = (uint8_t)result + 1u;
+        s_accel_cal_state = ACCEL_CAL_STATE_ERROR;
+        return;
+    }
+    s_accel_cal_mask |= (uint8_t)(1u << pose);
+    s_accel_cal_count = 0u;
+    s_accel_cal_pose = -1;
+    if (s_accel_cal_mask == ACCEL_CAL_POSE_MASK_ALL) {
+        result = AccelCal_Solve(&s_accel_cal_data, &s_accel_cal_result);
+        if (result == ACCEL_CAL_OK) {
+            for (axis = 0u; axis < 3u; ++axis) {
+                s_accel_cal_output[axis] = s_accel_cal_result.scale[axis];
+            }
+        }
+        s_accel_cal_error = (result == ACCEL_CAL_OK) ? 0u : (uint8_t)result + 1u;
+        s_accel_cal_state = (result == ACCEL_CAL_OK) ? ACCEL_CAL_STATE_SOLVED : ACCEL_CAL_STATE_ERROR;
+    }
+}
+#endif
+
 /* ---- MS5611 非阻塞状态机 ---- */
 #if 0 /* 暂停气压计测量，保留代码以便恢复。 */
 enum {
@@ -68,6 +225,16 @@ void ReadPeripherals_Init(void) {
     // MS561101BA_Init();    /* 暂停气压计初始化：复位 + 读取 PROM */
     tick_counter = 0;
     mpu_calibration_pending = 1;
+
+#if ACCEL_CAL_MODE == 1
+    s_accel_cal_state = (AccelCal_Reset(&s_accel_cal_data, (float)MPU6050_ACCEL_1G_RAW)
+                         == ACCEL_CAL_OK) ? ACCEL_CAL_STATE_COLLECTING : ACCEL_CAL_STATE_ERROR;
+    s_accel_cal_mask = 0u;
+    s_accel_cal_count = 0u;
+    s_accel_cal_error = 0u;
+    s_accel_cal_pose = -1;
+    s_accel_cal_last_ms = HAL_GetTick();
+#endif
 
     /*
      * 打开 DWT 周期计数器，用来测两次采样的间隔。
@@ -110,6 +277,12 @@ static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags)
 void ReadPeripherals_Process(void) {
     uint32_t now = tick_counter;
 
+#if ACCEL_CAL_MODE == 1
+    (void)now;
+    AccelCal_CaptureSample();
+    return;
+#endif
+
     /* 初始化后的第一次调用先完成校准，不发布校准期间的原始数据。 */
     if (mpu_calibration_pending != 0) {
         int16_t ax, ay, az, gx, gy, gz;
@@ -130,7 +303,31 @@ void ReadPeripherals_Process(void) {
      * ============================================================ */
     {
         int16_t ax, ay, az, gx, gy, gz;
+#if ACCEL_CAL_MODE == 0 && ACCEL_CAL_PARAMS_VALID == 1
+        {
+            if (!(ACCEL_CAL_SCALE_X > 0.0f && ACCEL_CAL_SCALE_X <= FLT_MAX &&
+                  ACCEL_CAL_SCALE_Y > 0.0f && ACCEL_CAL_SCALE_Y <= FLT_MAX &&
+                  ACCEL_CAL_SCALE_Z > 0.0f && ACCEL_CAL_SCALE_Z <= FLT_MAX) ||
+                MPU6050_GetRawData(&ax, &ay, &az, &gx, &gy, &gz) == 0u) {
+                g_MPU6050.fresh = 0u;
+                g_Attitude.fresh = 0u;
+                s_attitude_ready = 0u;
+                return;
+            }
+            ax = AccelCal_ClampRaw(((float)ax - (float)g_MpuOffset.ax) * ACCEL_CAL_SCALE_X);
+            ay = AccelCal_ClampRaw(((float)ay - (float)g_MpuOffset.ay) * ACCEL_CAL_SCALE_Y);
+            /* 原开机校准存储 az_mean - 1g；恢复平均值后按实际方向保留 1g。 */
+            az = AccelCal_ClampRaw(((float)az - ((float)g_MpuOffset.az +
+                                                 (float)MPU6050_ACCEL_1G_RAW)) *
+                                   ACCEL_CAL_SCALE_Z +
+                                   (float)(ACCEL_CAL_START_Z_SIGN * MPU6050_ACCEL_1G_RAW));
+            gx = AccelCal_ClampRaw((float)((int32_t)gx - g_MpuOffset.gx));
+            gy = AccelCal_ClampRaw((float)((int32_t)gy - g_MpuOffset.gy));
+            gz = AccelCal_ClampRaw((float)((int32_t)gz - g_MpuOffset.gz));
+        }
+#else
         MPU6050_GetData(&ax, &ay, &az, &gx, &gy, &gz);
+#endif
 
         g_MPU6050.ax   = ax;
         g_MPU6050.ay   = ay;
@@ -280,6 +477,29 @@ void ReadPeripherals_Transmit(void)
     float gyr_dps[3];
     int16_t mag[3];
 
+#if ACCEL_CAL_MODE == 1
+    {
+        float values[7];
+        uint8_t i;
+
+        if (++s_accel_cal_tx_div < 40u) {
+            return;
+        }
+        s_accel_cal_tx_div = 0u;
+        OS_ENTER_CRITICAL();
+        values[0] = (float)s_accel_cal_state;
+        values[1] = (float)s_accel_cal_mask;
+        values[2] = (float)s_accel_cal_count;
+        values[3] = (float)s_accel_cal_error;
+        for (i = 0u; i < 3u; ++i) {
+            values[i + 4u] = s_accel_cal_output[i];
+        }
+        OS_EXIT_CRITICAL();
+        ANO_SendFloats(0xF1u, values, 7u);
+        return;
+    }
+#endif
+
     /* 只在复制快照时保护共享数据，格式化和串口发送允许任务抢占。 */
     OS_ENTER_CRITICAL();
     mpu = g_MPU6050;
@@ -317,7 +537,9 @@ void ReadPeripherals_Transmit(void)
             gyr_dps[1] = (float)mpu.gy / MPU6050_GYRO_LSB_PER_DPS;
             gyr_dps[2] = (float)mpu.gz / MPU6050_GYRO_LSB_PER_DPS;
 
-            ANO_SendFC_AccGyr(acc_ms2, gyr_dps, 0u);
+            if (mpu.fresh != 0u) {
+                ANO_SendFC_AccGyr(acc_ms2, gyr_dps, 0u);
+            }
         }
 
         /* 环境帧 25Hz：磁力变化慢，气压高度暂未启用。 */

@@ -85,7 +85,9 @@ static void BSP_Init(void)
 {
     // OLED_Init();
     IC_Init();
+#if ACCEL_CAL_MODE == 0
     BLDC_Init();
+#endif
     ReadPeripherals_Init();
     UART1_FULL_INIT(115200); // must 115200 baudrate
 }
@@ -102,12 +104,14 @@ static void AppTaskStart(void *p_arg)
     // /* 同时校准 TIM3 四路电调；必须全部拆桨，校准完成后注释此调用。 */
     // Calibrate_BLDC_All();
 
+#if ACCEL_CAL_MODE == 0
     /* 四路保持最小油门脉宽，让电调完成上电解锁。 */
     BLDC_SetThrottle_us(BLDC_MIN_US, 1);
     BLDC_SetThrottle_us(BLDC_MIN_US, 2);
     BLDC_SetThrottle_us(BLDC_MIN_US, 3);
     BLDC_SetThrottle_us(BLDC_MIN_US, 4);
     OSTimeDlyHMSM(0, 0, 5, 0);
+#endif
 
     OSTaskCreate(AppTaskSensor,
                  (void *)0,
