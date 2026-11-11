@@ -18,6 +18,7 @@
 # Logs and locks
 *.log
 *.lock
+/JLinkLog.txt
 
 # VS Code local runtime logs
 .vscode/uv4.log
