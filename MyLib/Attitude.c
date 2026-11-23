@@ -1,3 +1,8 @@
+/*
+ * 负责四旋翼的姿态初始化和更新。使用 Madgwick 算法融合陀螺仪、
+ * 加速度计和磁力计数据，更新姿态四元数并计算横滚角、俯仰角和偏航角。
+ */
+
 #include <math.h>
 #include "Attitude.h"
 #include "GY86.h"

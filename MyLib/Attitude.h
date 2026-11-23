@@ -85,6 +85,7 @@
 #define ATTITUDE_MAG_MIN_HORIZONTAL  0.01f
 #endif
 
+/// @brief 姿态解算状态
 typedef struct {
     Quaternion_t  q;            /* 机体 → 大地 */
     EulerAngles_t euler;        /* 由 q 换算的欧拉角 (rad) */

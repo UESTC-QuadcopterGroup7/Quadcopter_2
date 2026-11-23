@@ -7,6 +7,7 @@
 
 typedef enum { FC_ROLL = 0, FC_PITCH, FC_YAW, FC_AXIS_COUNT } FC_Axis_t;
 
+/// @brief 飞控反馈数据结构体
 typedef struct {
     float roll_deg, pitch_deg;
     float rate_dps[FC_AXIS_COUNT]; /* 机体轴，右滚/抬头/右转为正：gx、-gy、-gz。 */
@@ -29,6 +30,7 @@ typedef enum {
     FC_STATUS_PID_ERROR
 } FC_Status_t;
 
+/// @brief 飞控运行状态结构体
 typedef struct {
     RC_Control_t rc;
     PID_t rate_pid[FC_AXIS_COUNT];
@@ -42,6 +44,7 @@ typedef struct {
     uint32_t previous_sequence;
     FC_Status_t status;
     uint8_t running;
+    uint8_t bench_fault_latched;  /* 无接收机测试启动后故障，复位前禁止重启。 */
     uint8_t tipover_latched;       /* 过倾角故障锁存；普通上锁或恢复信号不会清除。 */
     uint8_t tipover_clear_pending;
     uint32_t tipover_clear_start_ms;
@@ -55,6 +58,7 @@ uint8_t FC_Control_Init(FC_Control_t *control, uint32_t cycle_clock_hz);
  * 必须串行调用；motor 输出位于 control->rc.motor_us，顺序为 M1..M4。
  * 不重复积分同一个 sequence；无新样本时保留修正量并重新应用油门。
  * 反馈/时序异常会停机上锁，恢复后需要重新手势解锁。
+ * 无接收机台架模式下，启动后的故障停机锁存至复位；没有遥控恢复手势。
  * 总倾角达到停机阈值时锁存故障。扶正至解锁倾角内，油门为零、横滚/俯仰
  * 居中、偏航左满持续 FC_TIPOVER_CLEAR_HOLD_MS 才解除；之后仍须手势解锁。
  */

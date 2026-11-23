@@ -1,3 +1,7 @@
+/*
+ * 定义匿名上位机的协议帧
+ */
+
 #include "main.h"
 #include "ANO.h"
 #include "UART_Set.h"

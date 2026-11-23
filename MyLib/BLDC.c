@@ -1,3 +1,7 @@
+/*
+ * 无刷电机的相关函数
+ */
+
 #include "main.h"
 #include "GPIO_Set.h"
 #include "PWM_Set.h"

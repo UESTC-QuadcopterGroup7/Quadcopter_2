@@ -6,9 +6,6 @@
 #include "ANO.h"
 #include "UART_Set.h"
 #include "ucos_ii.h"
-#include <float.h>
-#include <stdio.h>
-#include <string.h>
 
 #if ACCEL_CAL_MODE == 0 && ACCEL_CAL_PARAMS_VALID == 1
 #if ACCEL_CAL_PARAMS_1G_RAW != MPU6050_ACCEL_1G_RAW
@@ -16,9 +13,9 @@
 #endif
 #endif
 
-/* ================================================================
+/*
  *  跨任务共享的传感器数据
- * ================================================================ */
+ */
 volatile MPU6050_Read_t  g_MPU6050  = {0};
 volatile HMC5883L_Read_t g_HMC5883L = {0};
 volatile MS5611_Read_t   g_MS5611   = {0};
@@ -26,27 +23,26 @@ volatile Attitude_Read_t g_Attitude = {0};
 static volatile FC_Feedback_t s_control_feedback = {0};
 static uint32_t s_feedback_sequence = 0u;
 
-/* ================================================================
+/*
  *  本地状态变量
- * ================================================================ */
+ */
 
 /* 遥测采样序号，不作为控制器的实际时间。 */
 static uint32_t tick_counter = 0;
 static uint8_t mpu_calibration_pending = 1;
 
-/* ---- 发送节奏 ---- */
-
+/* 发送节奏 */
 /* 通信任务每 10ms 调用一次 Transmit；ANO_TICK_DIV = 1 → 每拍都发姿态帧（100Hz）。 */
 #define ANO_TICK_DIV      1u
 
 /* ---- 姿态解算状态 ---- */
-static Attitude_t s_attitude;
-static uint32_t   s_attitude_last_cyc = 0;
-static uint8_t    s_attitude_ready = 0;
-static uint8_t    s_hmc_div = 0;
-static uint8_t    s_frame_div = 0;
-static uint8_t    s_motion_div = 0;
-static uint8_t    s_env_div = 0;
+static Attitude_t s_attitude;              /* 姿态解算状态，保存四元数和欧拉角 */
+static uint32_t   s_attitude_last_cyc = 0; /* 上次姿态解算的 CPU 周期计数，用于计算时间间隔 dt */
+static uint8_t    s_attitude_ready = 0;    /* 姿态初始化成功后置 1 */
+static uint8_t    s_hmc_div = 0;           /* 磁力计读取分频计数，每 4 个采样周期读取一次 */
+static uint8_t    s_frame_div = 0;         /* ANO 遥测发送计数，达到 ANO_TICK_DIV 时进入发送流程 */
+static uint8_t    s_motion_div = 0;        /* 运动帧分频计数，每 2 个遥测发送周期处理一次 */
+static uint8_t    s_env_div = 0;           /* 环境帧分频计数，每 4 个遥测发送周期发送一次 */
 
 #if ACCEL_CAL_MODE == 0 && ACCEL_CAL_PARAMS_VALID == 1
 static int16_t AccelCal_ClampRaw(float value)
@@ -197,7 +193,7 @@ static void AccelCal_CaptureSample(void)
 }
 #endif
 
-/* ---- MS5611 非阻塞状态机 ---- */
+/* MS5611 非阻塞状态机 */
 #if 0 /* 暂停气压计测量，保留代码以便恢复。 */
 enum {
     MS5611_IDLE    = 0,
@@ -215,9 +211,8 @@ static uint32_t ms5611_d2_raw   = 0;
 static uint32_t ms5611_d1_raw   = 0;
 #endif
 
-/* ================================================================
- *  ReadPeripherals_Init
- * ================================================================ */
+/// @brief 初始化外设读取器
+/// @param  
 void ReadPeripherals_Init(void) {
     FC_Feedback_t empty_feedback = {0};
     MPU6050_Init();
@@ -255,6 +250,10 @@ void ReadPeripherals_Init(void) {
  *
  *  把姿态解算结果换算成角度后写入共享结构体。
  * ================================================================ */
+
+/// @brief 将飞控反馈标记为无效，并清除传感器和姿态的新数据标志。
+/// @details 在同一临界区内清除飞控反馈的 valid 标志，以及 MPU6050 和姿态结果的 fresh 标志。
+///          随后清除姿态初始化标志，等待下一个可信样本重新初始化。
 static void InvalidateControlFeedback(void)
 {
     OS_CPU_SR cpu_sr;
@@ -266,6 +265,9 @@ static void InvalidateControlFeedback(void)
     s_attitude_ready = 0u;
 }
 
+/// @brief 读取最近一次发布的飞控反馈快照。
+/// @details 在临界区内复制整份反馈，调用方可通过快照中的 valid 标志判断数据是否有效。
+/// @param[out] feedback 接收快照的结构体指针。传入空指针时直接返回。
 void ReadPeripherals_GetControlFeedback(FC_Feedback_t *feedback)
 {
     OS_CPU_SR cpu_sr;
@@ -275,6 +277,14 @@ void ReadPeripherals_GetControlFeedback(FC_Feedback_t *feedback)
     OS_EXIT_CRITICAL();
 }
 
+/// @brief 发布姿态角供遥测使用，并生成供飞控使用的反馈快照。
+/// @details 将姿态转换为欧拉角（度），将陀螺仪读数转换为三轴角速度（度/秒）。
+///          角速度转换结果决定反馈的有效标志。两份共享数据在同一临界区内更新。
+/// @param[in] att 已完成初始化或更新的姿态解算状态。
+/// @param[in] tick 外设采样任务的计数值，随姿态数据发布。
+/// @param[in] flags ATTITUDE_FLAG_* 的组合，记录本次解算的更新和传感器修正状态。
+/// @param[in] sample_ms 采样时的 HAL_GetTick() 时间戳（毫秒），用于判断反馈是否超时。
+/// @param[in] sample_cycles 采样时的 DWT 周期计数，用于计算相邻样本的时间间隔。
 static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags,
                             uint32_t sample_ms, uint32_t sample_cycles)
 {
@@ -308,13 +318,13 @@ static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags,
     OS_EXIT_CRITICAL();
 }
 
-/* ================================================================
+/*
  *  ReadPeripherals_Process
  *
  *  由 AppTaskSensor 循环调用（间隔 1ms 延时 + I2C 读取时间）。
  *  采集 MPU6050 和 HMC5883L，并用 Madgwick 滤波解算姿态；
  *  MS5611 测量已暂停。
- * ================================================================ */
+ */
 void ReadPeripherals_Process(void) {
     uint32_t now = tick_counter;
     uint32_t sample_ms, sample_cycles;
@@ -325,7 +335,9 @@ void ReadPeripherals_Process(void) {
     return;
 #endif
 
-    /* 初始化后的第一次调用先完成校准，不发布校准期间的原始数据。 */
+    /* 初始化后首次调用时先完成零偏校准。每隔约 10 ms 采样一次，
+     * 累计 100 个有效样本，正常约耗时 1 秒，随后开始发布传感器数据。
+     */
     if (mpu_calibration_pending != 0) {
         int16_t ax, ay, az, gx, gy, gz;
 
@@ -514,6 +526,8 @@ void ReadPeripherals_Process(void) {
     tick_counter++;
 }
 
+/// @brief 传输外设数据
+/// @param  
 void ReadPeripherals_Transmit(void)
 {
     MPU6050_Read_t mpu;
