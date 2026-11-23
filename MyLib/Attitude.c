@@ -9,7 +9,7 @@
  * 即 ±2000°/s、16.4 LSB/(°/s)。加速度的 1g 计数由 GY86.h 中的
  * MPU6050_ACCEL_1G_RAW 按当前加速度量程算出，改量程时只需改那一处。
  */
-#define ATTITUDE_GYRO_LSB_PER_DPS   (16.4f)
+#define ATTITUDE_GYRO_LSB_PER_DPS   MPU6050_GYRO_LSB_PER_DPS
 #define ATTITUDE_ACCEL_LSB_PER_G    ((float)MPU6050_ACCEL_1G_RAW)
 
 /* 磁场向量（原始计数）小于该值时视为无效：HMC5883L 读失败会返回全 0xFF。 */

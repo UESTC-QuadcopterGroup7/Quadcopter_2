@@ -1151,6 +1151,31 @@
               <FilePath>.\MyLib\RC_Control.h</FilePath>
             </File>
             <File>
+              <FileName>PID.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\MyLib\PID.c</FilePath>
+            </File>
+            <File>
+              <FileName>PID.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\PID.h</FilePath>
+            </File>
+            <File>
+              <FileName>FlightControl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\MyLib\FlightControl.c</FilePath>
+            </File>
+            <File>
+              <FileName>FlightControl.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\FlightControl.h</FilePath>
+            </File>
+            <File>
+              <FileName>FlightControlConfig.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\FlightControlConfig.h</FilePath>
+            </File>
+            <File>
               <FileName>ReadPeripherals.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\MyLib\ReadPeripherals.c</FilePath>

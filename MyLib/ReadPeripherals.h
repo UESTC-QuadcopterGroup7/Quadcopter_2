@@ -2,6 +2,7 @@
 #define __READPERIPHERALS_H
 
 #include <stdint.h>
+#include "FlightControl.h"
 
 /*
  * 0：正常启动；1：只采集六姿态求比例系数，禁止连接电调动力电源。
@@ -81,5 +82,7 @@ extern volatile Attitude_Read_t g_Attitude;
 void ReadPeripherals_Init(void);
 void ReadPeripherals_Process(void);
 void ReadPeripherals_Transmit(void);
+/* 同一采样的姿态、陀螺、有效标志和时间戳；发布和读取都保护完整结构体。 */
+void ReadPeripherals_GetControlFeedback(FC_Feedback_t *feedback);
 
 #endif

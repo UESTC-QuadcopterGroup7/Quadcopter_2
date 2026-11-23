@@ -152,64 +152,15 @@ uint8_t MPU6050_ReadReg(uint8_t RegAddr) {
 	return RecByte;
 }
 
-/*
- * 从 RegAddr 开始连续读 len 个字节（MPU6050 寄存器地址自动递增）。
- *
- * 原来是每个寄存器单独起一次 I2C 事务，加速度+陀螺共 12 次；
- * 在软件 I2C 上每次事务都要几百微秒，累计十几毫秒，直接把采样率压到 40Hz。
- * 改用突发读后整帧只要一次事务。
- */
-static void MPU6050_ReadBurst(uint8_t RegAddr, uint8_t *buf, uint8_t len)
+uint8_t MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ,
+                        int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ)
 {
-	uint8_t i;
-
-	MyI2C_Start();
-	MyI2C_SendByte(MPU6050_ADDRESS);
-	if (MyI2C_ReceiveAck() != 0) {
-		mpu_read_failed = 1;
-		MyI2C_Stop();
-		return;
-	}
-	MyI2C_SendByte(RegAddr);
-	if (MyI2C_ReceiveAck() != 0) {
-		mpu_read_failed = 1;
-		MyI2C_Stop();
-		return;
-	}
-
-	MyI2C_Start();
-	MyI2C_SendByte(MPU6050_ADDRESS | 0x01);
-	if (MyI2C_ReceiveAck() != 0) {
-		mpu_read_failed = 1;
-		MyI2C_Stop();
-		return;
-	}
-
-	for (i = 0; i < len; i++) {
-		buf[i] = MyI2C_ReceiveByte();
-		/* 最后一个字节回 NACK，其余回 ACK */
-		MyI2C_SendAck((uint8_t)((i + 1u == len) ? 1u : 0u));
-	}
-	MyI2C_Stop();
-}
-
-void MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ) {
-	uint8_t raw[14];
-
-    mpu_read_failed = 0;
-
-	/* 0x3B ~ 0x48：加速度 6 字节 + 温度 2 字节 + 陀螺 6 字节 */
-	MPU6050_ReadBurst(MPU6050_ACCEL_XOUT_H, raw, 14);
-
-	*AccX  = (int16_t)(((uint16_t)raw[0]  << 8) | raw[1]);
-	*AccY  = (int16_t)(((uint16_t)raw[2]  << 8) | raw[3]);
-	*AccZ  = (int16_t)(((uint16_t)raw[4]  << 8) | raw[5]);
-	/* raw[6]、raw[7] 是温度，当前不使用 */
-	*GyroX = (int16_t)(((uint16_t)raw[8]  << 8) | raw[9]);
-	*GyroY = (int16_t)(((uint16_t)raw[10] << 8) | raw[11]);
-	*GyroZ = (int16_t)(((uint16_t)raw[12] << 8) | raw[13]);
-
+    /* 与未补偿采样共用带 ACK 检查的 14 字节突发读。
+     * 读取失败时不解码未初始化缓冲区，也不发布新的控制反馈。 */
+    mpu_read_failed = (uint8_t)!MPU6050_GetRawData(AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
+    if (mpu_read_failed != 0u) return 0u;
     MPU6050_CalibrateSample(AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
+    return 1u;
 }
 
 uint8_t MPU6050_GetRawData(int16_t* AccX, int16_t* AccY, int16_t* AccZ,

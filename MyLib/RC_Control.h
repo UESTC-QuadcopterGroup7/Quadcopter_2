@@ -55,13 +55,15 @@ void RC_MakeSetpoint(const RC_Command_t *command, RC_Setpoint_t *setpoint);
 
 /* T/R/P/Y 单位均为 us；R 右滚、P 抬头、Y 右转为正。
  * 对角同向旋转是偏航混控成立的前提。饱和时同比缩放差速，再平移公共油门。
- * 可供后续 PID 输出复用；调用方仍须负责解锁、失联及回中停机。
+ * FlightControl 使用 PID 输出调用此函数；调用方负责解锁、失联及回中停机。
  */
 void RC_Mix(float throttle_us, float roll_us, float pitch_us, float yaw_us,
             uint16_t motor_us[RC_MOTOR_COUNT]);
 void RC_Control_Init(RC_Control_t *control);
+void RC_Control_Disarm(RC_Control_t *control);
 
-/* 当前为开环差速验证：遥控输入直接产生混控修正量，尚未使用姿态反馈。
+/* 只生成遥控目标和解锁状态，motor_us 始终置停止值。
+ * 闭环输出由 FlightControl.c 生成，不再将摇杆直接混控到电机。
  * 回中油门 + 偏航右打满保持 1s 解锁；回中油门 + 偏航左打满保持 1s 上锁。
  * 解锁手势还要求横滚/俯仰居中；任一通道无效或超时立即上锁。
  */

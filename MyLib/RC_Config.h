@@ -53,12 +53,7 @@
 #define RC_MOTOR_MAX_US        2000u
 #define RC_MOTOR_OFF_US        RC_MOTOR_MIN_US
 
-/* 拆桨验证差速映射的最大修正脉宽；不是已经整定的 PID 参数。 */
-#define RC_ROLL_MIX_US         100.0f
-#define RC_PITCH_MIX_US        100.0f
-#define RC_YAW_MIX_US          80.0f
-
-/* 留给后续姿态/角速度闭环的目标值。 */
+/* 姿态/角速度闭环的目标值；PID 参数见 FlightControlConfig.h。 */
 #define RC_MAX_ROLL_DEG        20.0f
 #define RC_MAX_PITCH_DEG       20.0f
 #define RC_MAX_YAW_RATE_DPS    90.0f

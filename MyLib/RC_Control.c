@@ -137,6 +137,15 @@ void RC_Control_Init(RC_Control_t *control)
     StopMotors(control->motor_us);
 }
 
+void RC_Control_Disarm(RC_Control_t *control)
+{
+    if (control == 0) return;
+    control->armed = 0u;
+    control->gesture = RC_GESTURE_NONE;
+    control->gesture_start_ms = 0u;
+    StopMotors(control->motor_us);
+}
+
 void RC_Control_Update(RC_Control_t *control, const RC_Input_t *input, uint32_t now_ms)
 {
     uint8_t gesture = RC_GESTURE_NONE;
@@ -168,11 +177,5 @@ void RC_Control_Update(RC_Control_t *control, const RC_Input_t *input, uint32_t 
         control->gesture = RC_GESTURE_NONE;
     }
 
-    /* 回中油门始终输出停止值，摇动其余三路也不会带动电机。 */
-    if (control->armed == 0u || control->command.throttle <= 0.0f) return;
-    RC_Mix((float)RC_MOTOR_MIN_US + control->command.throttle *
-           (float)(RC_MOTOR_MAX_US - RC_MOTOR_MIN_US),
-           control->command.roll * RC_ROLL_MIX_US,
-           control->command.pitch * RC_PITCH_MIX_US,
-           control->command.yaw * RC_YAW_MIX_US, control->motor_us);
+    /* 电机保持停止值，只有 FlightControl 完成反馈检查与 PID 后才写入混控结果。 */
 }

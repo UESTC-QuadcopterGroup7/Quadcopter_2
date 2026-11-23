@@ -23,12 +23,14 @@ volatile MPU6050_Read_t  g_MPU6050  = {0};
 volatile HMC5883L_Read_t g_HMC5883L = {0};
 volatile MS5611_Read_t   g_MS5611   = {0};
 volatile Attitude_Read_t g_Attitude = {0};
+static volatile FC_Feedback_t s_control_feedback = {0};
+static uint32_t s_feedback_sequence = 0u;
 
 /* ================================================================
  *  本地状态变量
  * ================================================================ */
 
-/* tick_counter: 每调用一次 Process() 自增 1，等价于 5ms 时间分辨率 */
+/* 遥测采样序号，不作为控制器的实际时间。 */
 static uint32_t tick_counter = 0;
 static uint8_t mpu_calibration_pending = 1;
 
@@ -36,9 +38,6 @@ static uint8_t mpu_calibration_pending = 1;
 
 /* 通信任务每 10ms 调用一次 Transmit；ANO_TICK_DIV = 1 → 每拍都发姿态帧（100Hz）。 */
 #define ANO_TICK_DIV      1u
-
-/* MPU6050 陀螺量程 ±2000°/s 对应的灵敏度 */
-#define MPU6050_GYRO_LSB_PER_DPS 16.4f
 
 /* ---- 姿态解算状态 ---- */
 static Attitude_t s_attitude;
@@ -220,11 +219,16 @@ static uint32_t ms5611_d1_raw   = 0;
  *  ReadPeripherals_Init
  * ================================================================ */
 void ReadPeripherals_Init(void) {
+    FC_Feedback_t empty_feedback = {0};
     MPU6050_Init();
     HMC5883L_Init();
     // MS561101BA_Init();    /* 暂停气压计初始化：复位 + 读取 PROM */
     tick_counter = 0;
     mpu_calibration_pending = 1;
+    s_control_feedback = empty_feedback;
+    s_feedback_sequence = 0u;
+    s_attitude_ready = 0u;
+    Attitude_Reset(&s_attitude);
 
 #if ACCEL_CAL_MODE == 1
     s_accel_cal_state = (AccelCal_Reset(&s_accel_cal_data, (float)MPU6050_ACCEL_1G_RAW)
@@ -251,20 +255,57 @@ void ReadPeripherals_Init(void) {
  *
  *  把姿态解算结果换算成角度后写入共享结构体。
  * ================================================================ */
-static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags)
+static void InvalidateControlFeedback(void)
+{
+    OS_CPU_SR cpu_sr;
+    OS_ENTER_CRITICAL();
+    s_control_feedback.valid = 0u;
+    g_MPU6050.fresh = 0u;
+    g_Attitude.fresh = 0u;
+    OS_EXIT_CRITICAL();
+    s_attitude_ready = 0u;
+}
+
+void ReadPeripherals_GetControlFeedback(FC_Feedback_t *feedback)
+{
+    OS_CPU_SR cpu_sr;
+    if (feedback == 0) return;
+    OS_ENTER_CRITICAL();
+    *feedback = s_control_feedback;
+    OS_EXIT_CRITICAL();
+}
+
+static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags,
+                            uint32_t sample_ms, uint32_t sample_cycles)
 {
     float roll_deg;
     float pitch_deg;
     float yaw_deg;
+    FC_Feedback_t feedback = {0};
+    int16_t gyro[FC_AXIS_COUNT];
+    OS_CPU_SR cpu_sr;
 
     Attitude_GetEulerDegrees(att, &roll_deg, &pitch_deg, &yaw_deg);
+    gyro[0] = g_MPU6050.gx;
+    gyro[1] = g_MPU6050.gy;
+    gyro[2] = g_MPU6050.gz;
+    feedback.roll_deg = roll_deg;
+    feedback.pitch_deg = pitch_deg;
+    feedback.valid = FC_ConvertGyro(gyro, feedback.rate_dps);
+    feedback.timestamp_ms = sample_ms;
+    feedback.timestamp_cycles = sample_cycles;
+    feedback.sequence = ++s_feedback_sequence;
 
+    /* 发布也必须加锁：只在读取端加锁，无法防止读到被抢占一半的写入。 */
+    OS_ENTER_CRITICAL();
     g_Attitude.roll  = roll_deg;
     g_Attitude.pitch = pitch_deg;
     g_Attitude.yaw   = yaw_deg;
     g_Attitude.tick  = tick;
     g_Attitude.flags = flags;
     g_Attitude.fresh = 1;
+    s_control_feedback = feedback;
+    OS_EXIT_CRITICAL();
 }
 
 /* ================================================================
@@ -276,6 +317,7 @@ static void PublishAttitude(const Attitude_t *att, uint32_t tick, uint8_t flags)
  * ================================================================ */
 void ReadPeripherals_Process(void) {
     uint32_t now = tick_counter;
+    uint32_t sample_ms, sample_cycles;
 
 #if ACCEL_CAL_MODE == 1
     (void)now;
@@ -309,9 +351,7 @@ void ReadPeripherals_Process(void) {
                   ACCEL_CAL_SCALE_Y > 0.0f && ACCEL_CAL_SCALE_Y <= FLT_MAX &&
                   ACCEL_CAL_SCALE_Z > 0.0f && ACCEL_CAL_SCALE_Z <= FLT_MAX) ||
                 MPU6050_GetRawData(&ax, &ay, &az, &gx, &gy, &gz) == 0u) {
-                g_MPU6050.fresh = 0u;
-                g_Attitude.fresh = 0u;
-                s_attitude_ready = 0u;
+                InvalidateControlFeedback();
                 return;
             }
             ax = AccelCal_ClampRaw(((float)ax - (float)g_MpuOffset.ax) * ACCEL_CAL_SCALE_X);
@@ -326,9 +366,14 @@ void ReadPeripherals_Process(void) {
             gz = AccelCal_ClampRaw((float)((int32_t)gz - g_MpuOffset.gz));
         }
 #else
-        MPU6050_GetData(&ax, &ay, &az, &gx, &gy, &gz);
+        if (!MPU6050_GetData(&ax, &ay, &az, &gx, &gy, &gz)) {
+            InvalidateControlFeedback();
+            return;
+        }
 #endif
 
+        sample_cycles = DWT->CYCCNT;
+        sample_ms = HAL_GetTick();
         g_MPU6050.ax   = ax;
         g_MPU6050.ay   = ay;
         g_MPU6050.az   = az;
@@ -370,7 +415,7 @@ void ReadPeripherals_Process(void) {
         int16_t gyro[3];
         int16_t mag[3];
         const int16_t *mag_ptr = 0;
-        uint32_t now_cyc = DWT->CYCCNT;
+        uint32_t now_cyc = sample_cycles;
 
         accel[0] = g_MPU6050.ax;
         accel[1] = g_MPU6050.ay;
@@ -402,7 +447,7 @@ void ReadPeripherals_Process(void) {
                 }
                 s_attitude_ready = 1;
                 s_attitude_last_cyc = now_cyc;
-                PublishAttitude(&s_attitude, now, flags);
+                PublishAttitude(&s_attitude, now, flags, sample_ms, sample_cycles);
             }
         } else {
             float dt = (float)(uint32_t)(now_cyc - s_attitude_last_cyc) / (float)SystemCoreClock;
@@ -410,7 +455,9 @@ void ReadPeripherals_Process(void) {
 
             s_attitude_last_cyc = now_cyc;
             if (flags != 0) {
-                PublishAttitude(&s_attitude, now, flags);
+                PublishAttitude(&s_attitude, now, flags, sample_ms, sample_cycles);
+            } else {
+                InvalidateControlFeedback();
             }
         }
     }

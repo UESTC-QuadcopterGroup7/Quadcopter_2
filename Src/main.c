@@ -21,7 +21,7 @@ UART_HandleTypeDef huart1;
 static OS_STK AppTaskStartStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 #if ACCEL_CAL_MODE == 0
 static OS_STK AppTaskControlStk[APP_CFG_CONTROL_TASK_STK_SIZE];
-static RC_Control_t s_rc_control; /* 调试器查看输入、目标值、解锁状态和四路输出。 */
+static FC_Control_t s_flight_control; /* 闭环目标、PID 各项、状态及 rc.motor_us。 */
 static void AppTaskControl(void *p_arg);
 #endif
 static OS_STK AppTaskSensorStk[APP_CFG_SENSOR_TASK_STK_SIZE];
@@ -155,16 +155,20 @@ static void AppTaskStart(void *p_arg)
 static void AppTaskControl(void *p_arg)
 {
     RC_Input_t input;
+    FC_Feedback_t feedback;
     uint8_t i;
     (void)p_arg;
-    RC_Control_Init(&s_rc_control);
+    if (!FC_Control_Init(&s_flight_control, SystemCoreClock)) {
+        Error_Handler();
+    }
     while (1) {
         IC_GetSnapshot(&input);
-        RC_Control_Update(&s_rc_control, &input, HAL_GetTick());
+        ReadPeripherals_GetControlFeedback(&feedback);
+        FC_Control_Update(&s_flight_control, &input, &feedback, HAL_GetTick());
         for (i = 0u; i < RC_MOTOR_COUNT; ++i) {
-            BLDC_SetThrottle_us(s_rc_control.motor_us[i], (uint8_t)(i + 1u));
+            BLDC_SetThrottle_us(s_flight_control.rc.motor_us[i], (uint8_t)(i + 1u));
         }
-        OSTimeDlyHMSM(0, 0, 0, 5);
+        OSTimeDlyHMSM(0, 0, 0, FC_CONTROL_PERIOD_MS);
     }
 }
 #endif

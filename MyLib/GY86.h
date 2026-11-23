@@ -35,6 +35,7 @@ extern uint8_t already_init;
 #define MPU6050_ACCEL_CONFIG_VALUE 0x18u
 #define MPU6050_ACCEL_1G_RAW (16384 >> ((MPU6050_ACCEL_CONFIG_VALUE >> 3) & 0x03u))
 #define MPU6050_CALIBRATION_SAMPLES 100u
+#define MPU6050_GYRO_LSB_PER_DPS 16.4f /* GYRO_CONFIG=0x18，±2000 deg/s。 */
 
 typedef struct {
     int32_t ax, ay, az;
@@ -51,7 +52,8 @@ uint8_t MPU6050_CalibrationStatus(void);
 void MPU6050_WriteReg(uint8_t RegAddr, uint8_t data);
 void MPU6050_Init(void);
 uint8_t MPU6050_ReadReg(uint8_t RegAddr);
-void MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ);
+/* 返回 1 表示成功；失败时输出保持原值且不推进上电偏置校准。 */
+uint8_t MPU6050_GetData(int16_t* AccX, int16_t* AccY, int16_t* AccZ, int16_t* GyroX, int16_t* GyroY, int16_t* GyroZ);
 /* 连续读取一帧未补偿的完整数据；返回 1 表示成功，0 表示失败，失败时输出保持原值。
  * 用于多姿态校准；调用方必须保证 MyI2C 总线访问互斥。
  * 此接口不会推进现有上电偏置校准，也不会应用其补偿结果。
