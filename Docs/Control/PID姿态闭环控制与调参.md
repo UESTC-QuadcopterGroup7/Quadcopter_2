@@ -13,7 +13,7 @@
 | CH3 油门 | 中点以上半程映射 0～1 | **停机**，不保留高度或悬停油门 |
 | CH4 偏航 | -90°/s～+90°/s，右转为正 | 目标转速为 0；抑制旋转，不锁定绝对航向 |
 
-保留之前的自动回中油门规则：CH3 的 1000～1520 μs 为停止，1520～2000 μs 逐渐增加油门。其他三路的 1480～1520 μs 为死区，通道及方向仍在 [RC_Config.h](../../MyLib/RC_Config.h) 中配置。
+保留之前的自动回中油门规则：CH3 的 1000～1520 μs 为停止，1520～2000 μs 逐渐增加油门。其他三路的 1480～1520 μs 为死区，通道及方向仍在 [RC_Config.h](../../Firmware/Control/RC_Config.h) 中配置。
 
 四台电机的位置不变：M1 右后、M2 右前、M3 左前、M4 左后；PCB 槽位从左到右是 M4、M3、M2、M1。偏航混控按左前 CW、右后 CW、右前 CCW、左后 CCW 配置，其中左前 CW 已由实物确认，其余三台仍需核对。
 
@@ -32,11 +32,11 @@ GY86 → 偏置补偿 → Madgwick → 角度外环 P → 三轴目标机体角�
 
 | 文件 | 职责 |
 | --- | --- |
-| [PID.c / PID.h](../../MyLib/PID.h) | 通用 PID，测量微分、低通、条件积分与执行器回算 |
-| [FlightControl.c / FlightControl.h](../../MyLib/FlightControl.h) | 反馈检查、外环、三轴内环、停机及混控 |
-| [FlightControlConfig.h](../../MyLib/FlightControlConfig.h) | PID 增益、滤波、时序和倾角限制 |
-| [RC_Control.c](../../MyLib/RC_Control.c) | 遥控解码、目标生成和手势；单独调用不再生成电机差速 |
-| [ReadPeripherals.c](../../MyLib/ReadPeripherals.c) | 发布同一采样的姿态、角速度、有效标志和时间戳 |
+| [PID.c / PID.h](../../Firmware/Algorithms/PID.h) | 通用 PID，测量微分、低通、条件积分与执行器回算 |
+| [FlightControl.c / FlightControl.h](../../Firmware/Control/FlightControl.h) | 反馈检查、外环、三轴内环、停机及混控 |
+| [FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h) | PID 增益、滤波、时序和倾角限制 |
+| [RC_Control.c](../../Firmware/Control/RC_Control.c) | 遥控解码、目标生成和手势；单独调用不再生成电机差速 |
+| [ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c) | 发布同一采样的姿态、角速度、有效标志和时间戳 |
 | [main.c](../../Src/main.c) | 每 5 ms 读取快照，调用闭环并写四路电调 |
 
 `FC_Control_Init(&control, SystemCoreClock)` 接收 DWT 计数器频率。周期调用：
@@ -52,7 +52,7 @@ FC_Control_Update(&s_flight_control, &input, &feedback, HAL_GetTick());
 
 ## 3. 角度、角速度与电机方向
 
-机体坐标沿用 [Quaternion.h](../../MyLib/Quaternion.h)：X 向前、Y 向左、Z 向上。显示角度和混控约定为右滚、抬头、右转为正，因此不能把陀螺三个原始值直接当成相同符号的控制反馈：
+机体坐标沿用 [Quaternion.h](../../Firmware/Algorithms/Quaternion.h)：X 向前、Y 向左、Z 向上。显示角度和混控约定为右滚、抬头、右转为正，因此不能把陀螺三个原始值直接当成相同符号的控制反馈：
 
 | 控制反馈 | 原始 MPU6050 计数换算 |
 | --- | --- |
@@ -169,7 +169,7 @@ cos(total_tilt) = cos(roll) * cos(pitch)
 
 ## 6. 参数表
 
-全部初始参数位于 [FlightControlConfig.h](../../MyLib/FlightControlConfig.h)，改动后重新编译。
+全部初始参数位于 [FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h)，改动后重新编译。
 
 | 参数 | 横滚 / 俯仰 | 偏航 | 单位 |
 | --- | --- | --- | --- |

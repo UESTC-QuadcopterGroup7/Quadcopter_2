@@ -4,7 +4,7 @@
 
 ## 1. 找到三个轴的参数
 
-横滚和俯仰有两层控制。**角度外环 P**根据机身偏离目标角度的幅度，给出回正所需的角速度。**角速度内环 PID**比较目标角速度和陀螺仪测得的角速度，输出电机混控使用的 PWM 修正量。偏航只有角速度内环，偏航目标为 `0°/s` 时会抑制转动。机头停在新方向属于这个控制方式的正常表现。[FlightControl.c](../../MyLib/FlightControl.c)
+横滚和俯仰有两层控制。**角度外环 P**根据机身偏离目标角度的幅度，给出回正所需的角速度。**角速度内环 PID**比较目标角速度和陀螺仪测得的角速度，输出电机混控使用的 PWM 修正量。偏航只有角速度内环，偏航目标为 `0°/s` 时会抑制转动。机头停在新方向属于这个控制方式的正常表现。[FlightControl.c](../../Firmware/Control/FlightControl.c)
 
 | 轴 | 角度外环 P | 角速度 Kp | 角速度 Ki | 角速度 Kd |
 | --- | --- | --- | --- | --- |
@@ -12,11 +12,11 @@
 | 俯仰 Pitch | `FC_PITCH_ANGLE_KP` = `4.0` | `FC_PITCH_RATE_KP` = `0.80` | `FC_PITCH_RATE_KI` = `0.25` | `FC_PITCH_RATE_KD` = `0.005` |
 | 偏航 Yaw | 无 | `FC_YAW_RATE_KP` = `1.00` | `FC_YAW_RATE_KI` = `0.20` | `FC_YAW_RATE_KD` = `0.00` |
 
-表中是仓库当前的起始值。参数在 `MyLib/FlightControlConfig.h`，修改后需要重新编译并烧录，再重复同一轮测试。[FlightControlConfig.h](../../MyLib/FlightControlConfig.h)
+表中是仓库当前的起始值。参数在 `Firmware/Control/FlightControlConfig.h`，修改后需要重新编译并烧录，再重复同一轮测试。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h)
 
 ### 调整范围和单次步长
 
-下面的范围按**当前固件初值的约 ±25%**估算，用来判断台架微调时小数点该落在哪一位。这个范围适用于本项目参数的单位和输出尺度。稳定区间要根据台架上实测的回正、振荡和 PWM 余量确定。[FlightControlConfig.h](../../MyLib/FlightControlConfig.h)
+下面的范围按**当前固件初值的约 ±25%**估算，用来判断台架微调时小数点该落在哪一位。这个范围适用于本项目参数的单位和输出尺度。稳定区间要根据台架上实测的回正、振荡和 PWM 余量确定。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h)
 
 | 轴与参数 | 数量级 | 当前初值 | 台架微调参考范围 | 单次步长（按初值的 5%～10% 换算） |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@
 
 1. **先拆桨查方向。** 水平、静止上电完成零偏校准，核对姿态显示、电机编号、旋向和纠偏 PWM。M1 右后、M2 右前、M3 左前、M4 左后。拆桨阶段用来确认信号和混控方向，观察实际回正需要机体能绕被测轴运动。[电机与螺旋桨旋向](../Hardware/四轴电机与螺旋桨旋向.md)
 2. **每次让台架只允许被测轴在受限范围内转动。** 台架固定在稳固底座上，限制机体平移，留出桨叶净空并隔离人员。上电前确认能在桨叶范围外切断动力。带桨时通过台架机构施加小扰动，或用遥控给小幅指令。停机并断开动力后再调整夹具。刚性夹紧的轴只能检查输出方向，台架摩擦、配重和线缆拉力也会改变回正表现。
-3. **选测试方式。** 当前 `RC_RECEIVER_ENABLED = 0`，台架模式启动检查连续通过 `10 s` 后自动开转，默认运行 `30 s`，基础 PWM 为 `1150 µs`，三轴目标均为零。这适合看受扰后能否回正或制动。需要主动给某一轴目标时，使用 `RC_RECEIVER_ENABLED = 1`，把该轴对应的 `RC_TUNING_LOCK_ROLL`、`RC_TUNING_LOCK_PITCH` 或 `RC_TUNING_LOCK_YAW` 改为 `0`，另外两轴保持目标锁定。台架模式始终使用零目标。 [RC_Config.h](../../MyLib/RC_Config.h) · [RC_Control.c](../../MyLib/RC_Control.c)
+3. **选测试方式。** 当前 `RC_RECEIVER_ENABLED = 0`，台架模式启动检查连续通过 `10 s` 后自动开转，默认运行 `30 s`，基础 PWM 为 `1150 µs`，三轴目标均为零。这适合看受扰后能否回正或制动。需要主动给某一轴目标时，使用 `RC_RECEIVER_ENABLED = 1`，把该轴对应的 `RC_TUNING_LOCK_ROLL`、`RC_TUNING_LOCK_PITCH` 或 `RC_TUNING_LOCK_YAW` 改为 `0`，另外两轴保持目标锁定。台架模式始终使用零目标。 [RC_Config.h](../../Firmware/Control/RC_Config.h) · [RC_Control.c](../../Firmware/Control/RC_Control.c)
 
 ## 3. 分别怎么观察横滚、俯仰和偏航
 
@@ -44,7 +44,7 @@
 | 俯仰 | 允许机头小幅抬起或低下，观察回正和过冲。台架要在断电时先检查前后配重和支点。 | 以目标为零、机头抬起且角速度接近零为例，后侧 M1、M4 的 PWM 应比前侧 M2、M3 高。 |
 | 偏航 | 保持机身接近水平，允许机头绕竖轴小幅转动。观察松开扰动后多久停止转动，或小幅转向指令下角速度能否跟上。 | 以目标为零、机身正在向右转为例，当前 `RC_FRONT_LEFT_CW = 1` 配置下，CW 对角 M1、M3 的 PWM 应比 CCW 对角 M2、M4 高。 |
 
-用单轴、小幅扰动判断上表的方向。方向相反时，断电检查姿态正负号、电机编号、旋向和混控方向。确认后再调对应轴的增益。[FlightControl.c](../../MyLib/FlightControl.c) · [RC_Control.c](../../MyLib/RC_Control.c)
+用单轴、小幅扰动判断上表的方向。方向相反时，断电检查姿态正负号、电机编号、旋向和混控方向。确认后再调对应轴的增益。[FlightControl.c](../../Firmware/Control/FlightControl.c) · [RC_Control.c](../../Firmware/Control/RC_Control.c)
 
 ## 4. 看到什么现象，就改哪个参数
 
@@ -64,7 +64,7 @@
 ## 5. 记录哪些数据
 
 - **看角速度跟踪。** 同时记录被测轴的 `rate_setpoint_dps` 和 `filtered_rate_dps`，再看 `rate_pid[i].p_term`、`i_term`、`d_term` 与 `correction_us[i]`。下标 `0`、`1`、`2` 分别对应横滚、俯仰和偏航。角速度跟踪正常后，再用实测横滚、俯仰角判断外环。
-- **先确认 I 项有机会工作。** `FC_INTEGRAL_MIN_THROTTLE = 0.10`，低于 10% 的归一化油门时会冻结积分。默认的 `1150 µs` 对应 15% 油门，满足这一门槛。电调是否起转、实际有多少推力，可从该台架的运行情况单独确认。[FlightControlConfig.h](../../MyLib/FlightControlConfig.h) · [FlightControl.c](../../MyLib/FlightControl.c)
+- **先确认 I 项有机会工作。** `FC_INTEGRAL_MIN_THROTTLE = 0.10`，低于 10% 的归一化油门时会冻结积分。默认的 `1150 µs` 对应 15% 油门，满足这一门槛。电调是否起转、实际有多少推力，可从该台架的运行情况单独确认。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h) · [FlightControl.c](../../Firmware/Control/FlightControl.c)
 - **用 ANO 看状态，用连续采样看快速振荡。** `0xF1` 飞控诊断帧约每 `200 ms` 发送一次，包含状态码、台架等待时间、反馈有效标志、倾角、四路 PWM、故障锁存和校准计数。判断快速振荡需要连续采集目标、实测和 PID 量。带桨运行期间应保持控制任务连续执行，把断点和暂停检查留到断开动力后。 [main.c](../../Src/main.c)
 
 | 测试轴和动作 | 更改的宏及旧值 → 新值 | 最大过冲和稳定时间 | PWM 是否触限、故障码、备注 |

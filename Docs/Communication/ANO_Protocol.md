@@ -1,6 +1,6 @@
 # 匿名上位机通信：ANO 模块
 
-本文说明本项目新增的 `MyLib/ANO.c` / `MyLib/ANO.h`：为什么要发二进制帧、帧长什么样、每个字段的单位、
+本文说明本项目新增的 `Firmware/Communication/ANO.c` / `Firmware/Communication/ANO.h`：为什么要发二进制帧、帧长什么样、每个字段的单位、
 三条飞控帧分别喂给上位机的哪些通道、`ReadPeripherals.c` 怎么调用、以及现在还没做什么。
 
 本文只描述当前源码状态，参数是按公开资料与实测现象估的，不代表已逐字节对照官方手册验证。
@@ -29,10 +29,10 @@ ATT R:1.23 P:-0.45 Y:87.60
 
 | 文件 | 作用 |
 |---|---|
-| [MyLib/ANO.h](../MyLib/ANO.h) | 协议说明、定点比例宏、对外接口 |
-| [MyLib/ANO.c](../MyLib/ANO.c) | 组帧、校验、量化，并通过 `huart1` 发送 |
-| [MyLib/ReadPeripherals.c](../MyLib/ReadPeripherals.c) | 在通信任务里换算物理量并按节拍调用 ANO 接口 |
-| [LED.uvprojx](../LED.uvprojx) | 在 `MyLib` 分组中登记 `ANO.c` / `ANO.h` |
+| [Firmware/Communication/ANO.h](../../Firmware/Communication/ANO.h) | 协议说明、定点比例宏、对外接口 |
+| [Firmware/Communication/ANO.c](../../Firmware/Communication/ANO.c) | 组帧、校验、量化，并通过 `huart1` 发送 |
+| [Firmware/Services/ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c) | 在通信任务里换算物理量并按节拍调用 ANO 接口 |
+| [LED.uvprojx](../../LED.uvprojx) | 在 `Firmware Communication` 分组中登记 `ANO.c` / `ANO.h` |
 
 依赖方向是单向的：`ANO.c` 只依赖 `main.h`（HAL）和 `UART_Set.h`（取 `huart1`），
 不认识任何传感器。`ReadPeripherals.c` 调用它，它不回调上层。
@@ -110,7 +110,7 @@ AA FF 03 06 E8 03 0C FE 28 23 F2 F9
 | `0x02` | 14 | 25 Hz | mag_x, mag_y, mag_z, alt, temp, sta_bar, sta_mag | `FC_MAG_X/Y/Z`、`FC_ALT_BAR`、`FC_SensorTMP`、`FC_STA_BAR/MAG` |
 | `0x03` | 6 | 50 Hz | roll, pitch, yaw | `FC_ATT_ROL/PIT/YAW` |
 
-单位换算集中在 [ANO.h](../MyLib/ANO.h) 的三个宏里：
+单位换算集中在 [ANO.h](../../Firmware/Communication/ANO.h) 的三个宏里：
 
 | 宏 | 值 | 含义 |
 |---|---|---|
@@ -217,17 +217,17 @@ GY-86(I2C) ──► ReadPeripherals_Process() ──► g_MPU6050 / g_HMC5883L
 
 | 文件 | 改动 |
 |---|---|
-| [MyLib/Delay.c](../MyLib/Delay.c) | TIM5 改为自由运行，去掉每次调用 `Start`/`Stop` 的开销 |
-| [MyLib/MyI2C.c](../MyLib/MyI2C.c) | 半周期 10 µs → 2 µs（约 50 kHz → 150 kHz） |
-| [MyLib/GY86.c](../MyLib/GY86.c) | 突发读（MPU 14 字节、HMC 6 字节一次读完）、200 Hz 采样、184 Hz 低通 |
+| [Firmware/Drivers/Delay.c](../../Firmware/Drivers/Delay.c) | TIM5 改为自由运行，去掉每次调用 `Start`/`Stop` 的开销 |
+| [Firmware/Drivers/MyI2C.c](../../Firmware/Drivers/MyI2C.c) | 半周期 10 µs → 2 µs（约 50 kHz → 150 kHz） |
+| [Firmware/Drivers/GY86.c](../../Firmware/Drivers/GY86.c) | 突发读（MPU 14 字节、HMC 6 字节一次读完）、200 Hz 采样、184 Hz 低通 |
 
 ## 6. 可调参数
 
 | 位置 | 宏 | 默认 | 作用 |
 |---|---|---|---|
-| [ANO.c](../MyLib/ANO.c) | `ANO_TARGET_ADDR` | `0xFF` | 目标地址；个别固件版本认 `0xAF`，改这一行即可 |
-| [ReadPeripherals.c](../MyLib/ReadPeripherals.c) | `ANO_TICK_DIV` | 1 | 每 N 拍发一帧姿态；1 → 100 Hz |
-| [ANO.h](../MyLib/ANO.h) | `ANO_LSB_ACC/GYR/ATT` | 100/10/100 | 定点比例 |
+| [ANO.c](../../Firmware/Communication/ANO.c) | `ANO_TARGET_ADDR` | `0xFF` | 目标地址；个别固件版本认 `0xAF`，改这一行即可 |
+| [ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c) | `ANO_TICK_DIV` | 1 | 每 N 拍发一帧姿态；1 → 100 Hz |
+| [ANO.h](../../Firmware/Communication/ANO.h) | `ANO_LSB_ACC/GYR/ATT` | 100/10/100 | 定点比例 |
 
 文本行（`MPU` / `HMC` / `ATT`）目前整体包在 `#if 0` 里，不再发送，
 所以 `错误码率` 应当稳定在 `0.0000%`。需要临时看文本时，把那一块改成 `#if 1` 即可，

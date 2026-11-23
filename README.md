@@ -54,10 +54,10 @@ flowchart TD
 | 层次 | 主要文件 | 职责 |
 | --- | --- | --- |
 | 应用与调度 | [Src/main.c](Src/main.c)、[Config/app_cfg.h](Config/app_cfg.h) | 初始化、创建任务、组织输入与电机输出 |
-| 飞行控制 | [MyLib/FlightControl.c](MyLib/FlightControl.c)、[MyLib/PID.c](MyLib/PID.c) | 保护检查、姿态外环、角速度内环和输出修正 |
-| 遥控与混控 | [MyLib/RC_Control.c](MyLib/RC_Control.c) | 脉宽归一化、目标生成、手势、X 型电机分配 |
-| 姿态与数学 | [MyLib/Attitude.c](MyLib/Attitude.c)、[MyLib/Quaternion.c](MyLib/Quaternion.c) | 四元数融合、坐标变换与欧拉角换算 |
-| 采集与共享数据 | [MyLib/ReadPeripherals.c](MyLib/ReadPeripherals.c) | 校准、采样、解算、发布控制反馈和遥测快照 |
+| 飞行控制 | [Firmware/Control/FlightControl.c](Firmware/Control/FlightControl.c)、[Firmware/Algorithms/PID.c](Firmware/Algorithms/PID.c) | 保护检查、姿态外环、角速度内环和输出修正 |
+| 遥控与混控 | [Firmware/Control/RC_Control.c](Firmware/Control/RC_Control.c) | 脉宽归一化、目标生成、手势、X 型电机分配 |
+| 姿态与数学 | [Firmware/Algorithms/Attitude.c](Firmware/Algorithms/Attitude.c)、[Firmware/Algorithms/Quaternion.c](Firmware/Algorithms/Quaternion.c) | 四元数融合、坐标变换与欧拉角换算 |
+| 采集与共享数据 | [Firmware/Services/ReadPeripherals.c](Firmware/Services/ReadPeripherals.c) | 校准、采样、解算、发布控制反馈和遥测快照 |
 | 硬件驱动 | `GY86`、`MyI2C`、`Receive_IC`、`BLDC`、`UART_Set` | GPIO、I2C、定时器和串口访问 |
 | 平台 | `Drivers/`、`Source/`、`Port/`、`ucCPU/`、`ucLib/` | HAL、CMSIS、RTOS 内核与 Cortex-M4 移植 |
 
@@ -70,24 +70,12 @@ Quadcopter_2/
 ├── Src/                     应用入口、中断处理
 ├── Inc/                     主头文件、HAL 配置
 ├── Config/                  应用任务配置、uC/OS-II 配置与钩子
-├── MyLib/
-│   ├── GY86.c/h             MPU6050、HMC5883L、MS5611 驱动
-│   ├── MyI2C.c/h            传感器软件 I2C
-│   ├── Delay.c/h            TIM5 微秒延时
-│   ├── Receive_IC.c/h       遥控 PWM 捕获与输入快照
-│   ├── BLDC.c/h             TIM3 电调输出
-│   ├── ReadPeripherals.c/h  采样、校准、解算及共享数据
-│   ├── Attitude.c/h         Madgwick 姿态融合
-│   ├── Quaternion.c/h       四元数与三维向量运算
-│   ├── AccelCalibration.c/h 加速度计多姿态校准求解
-│   ├── RC_Control.c/h       遥控目标、解锁状态、电机混控
-│   ├── RC_Config.h          通道顺序、方向、死区及目标范围
-│   ├── PID.c/h              通用 PID
-│   ├── FlightControl.c/h    闭环控制及保护状态
-│   ├── FlightControlConfig.h PID、滤波及保护参数
-│   ├── ANO.c/h              上位机协议组帧
-│   ├── UART_Set.h           USART1 初始化
-│   └── OLED / BMP180        显示驱动与历史保留代码
+├── Firmware/                项目自有固件
+│   ├── Drivers/             传感器、电调、接收机、显示及外设接口
+│   ├── Algorithms/          姿态融合、四元数、加速度校准、通用 PID
+│   ├── Control/             飞控闭环、遥控目标、混控及控制参数
+│   ├── Communication/       ANO 上位机协议与组帧
+│   └── Services/            传感器采集、姿态解算与反馈发布
 ├── Drivers/                 STM32 HAL、CMSIS、设备启动文件
 ├── Source/                  uC/OS-II 内核
 ├── Port/                    Cortex-M4 上下文切换与 SysTick 移植
@@ -166,7 +154,7 @@ GY86 使用的 7 位 I2C 地址为 MPU6050 `0x68`、HMC5883L `0x1E`；驱动中�
 | CH4 | PB7 | TIM4_CH2 / AF2 | `PWM_IN_Wid[3]` | 偏航 |
 | 信号地 | GND | — | — | 与飞控共地 |
 
-物理引脚在 [Receive_IC.h](MyLib/Receive_IC.h) 配置，通道功能和反向在 [RC_Config.h](MyLib/RC_Config.h) 配置。
+物理引脚在 [Receive_IC.h](Firmware/Drivers/Receive_IC.h) 配置，通道功能和反向在 [RC_Config.h](Firmware/Control/RC_Config.h) 配置。
 
 ### 3.2 电调与机架位置
 
@@ -242,7 +230,7 @@ uC/OS-II 的**优先级数值越小，任务优先级越高**。优先级及栈�
 
 ### 5.1 采样与单位
 
-MPU6050 初始化配置位于 [GY86.c](MyLib/GY86.c)，物理量换算常量位于 [GY86.h](MyLib/GY86.h)。
+MPU6050 初始化配置位于 [GY86.c](Firmware/Drivers/GY86.c)，物理量换算常量位于 [GY86.h](Firmware/Drivers/GY86.h)。
 
 | 参数 | 寄存器配置 / 数值 | 用途 |
 | --- | --- | --- |
@@ -282,7 +270,7 @@ R = Rz(-yaw) · Ry(-pitch) · Rx(roll)
 
 ### 5.3 Madgwick 四元数融合
 
-[Attitude.c](MyLib/Attitude.c) 使用加速度重力方向、可选磁场方向建立残差，计算梯度修正陀螺积分：
+[Attitude.c](Firmware/Algorithms/Attitude.c) 使用加速度重力方向、可选磁场方向建立残差，计算梯度修正陀螺积分：
 
 ```text
 gradient = Jᵀ · residual
@@ -311,7 +299,7 @@ q_next = normalize(q + q_dot · dt)
 | `ACCEL_CAL_SCALE_X/Y/Z` | 1.0 | 比例修正参数，参数有效开关打开后才应用 |
 | `ACCEL_CAL_START_Z_SIGN` | -1 | 可选比例修正分支中的启动 Z 方向，启用前须核实安装方向和姿态模型的一致性 |
 
-[AccelCalibration.c](MyLib/AccelCalibration.c) 提供多姿态拟合求解。自动六姿态模式采集 ±X、±Y、±Z 静止样本，输出比例系数供手动记录并填回源码，当前没有 Flash 参数持久化。具体步骤见 [六姿态校准操作](Docs/Hardware/MPU6050_加速度六姿态校准操作.md)。
+[AccelCalibration.c](Firmware/Algorithms/AccelCalibration.c) 提供多姿态拟合求解。自动六姿态模式采集 ±X、±Y、±Z 静止样本，输出比例系数供手动记录并填回源码，当前没有 Flash 参数持久化。具体步骤见 [六姿态校准操作](Docs/Hardware/MPU6050_加速度六姿态校准操作.md)。
 
 控制器使用 `FC_Feedback_t`：
 
@@ -330,7 +318,7 @@ MPU6050 读取失败或姿态更新返回失败时撤销有效反馈。控制器
 
 ## 6. 遥控器通道映射
 
-配置位于 [RC_Config.h](MyLib/RC_Config.h)，实现位于 [RC_Control.c](MyLib/RC_Control.c)。输入控制范围为 1000～2000 μs，中点 1500 μs；捕获层允许 900～2100 μs 的边界容差，解码时再限制到控制范围。
+配置位于 [RC_Config.h](Firmware/Control/RC_Config.h)，实现位于 [RC_Control.c](Firmware/Control/RC_Control.c)。输入控制范围为 1000～2000 μs，中点 1500 μs；捕获层允许 900～2100 μs 的边界容差，解码时再限制到控制范围。
 
 | 通道 | 数组下标配置 | 方向配置 | 脉宽增大时 | 目标范围 |
 | --- | --- | --- | --- | --- |
@@ -378,7 +366,7 @@ T = 1000 + throttle * 1000
 
 ### 7.1 控制结构与单位
 
-横滚、俯仰采用**角度 P 外环＋角速度 PID 内环**；偏航采用角速度 PID。实现入口为 [FlightControl.c](MyLib/FlightControl.c)，通用 PID 位于 [PID.c](MyLib/PID.c)。
+横滚、俯仰采用**角度 P 外环＋角速度 PID 内环**；偏航采用角速度 PID。实现入口为 [FlightControl.c](Firmware/Control/FlightControl.c)，通用 PID 位于 [PID.c](Firmware/Algorithms/PID.c)。
 
 ```text
 目标角度 - 实测角度 → 角度 P 外环 → 目标欧拉角速度
@@ -441,7 +429,7 @@ dt = (float)(uint32_t)(current_cycles - previous_cycles) / SystemCoreClock;
 
 ### 7.3 初始参数
 
-集中配置位于 [FlightControlConfig.h](MyLib/FlightControlConfig.h)，修改后重新编译。
+集中配置位于 [FlightControlConfig.h](Firmware/Control/FlightControlConfig.h)，修改后重新编译。
 
 | 参数 | 横滚 | 俯仰 | 偏航 | 单位 |
 | --- | --- | --- | --- | --- |
@@ -534,7 +522,7 @@ cos(total_tilt) = cos(roll) * cos(pitch)
 
 ### 9.1 ANO 串口协议
 
-[ANO.c](MyLib/ANO.c) 实现小端二进制协议，USART1 配置为 115200、8N1：
+[ANO.c](Firmware/Communication/ANO.c) 实现小端二进制协议，USART1 配置为 115200、8N1：
 
 ```text
 0xAA | 目标地址 0xFF | 功能码 | 数据字节数 | 数据 | 和校验 | 附加校验
@@ -594,14 +582,14 @@ SysTick 和 PendSV 负责系统节拍及任务切换，SystemView 用于观察�
 | 系统时钟与任务创建 | [Src/main.c](Src/main.c) |
 | 任务优先级、任务栈、内核中断边界 | [Config/app_cfg.h](Config/app_cfg.h) |
 | 系统节拍、内核功能、Trace 开关 | [Config/os_cfg.h](Config/os_cfg.h) |
-| 遥控通道、方向、死区、角度/转速目标范围 | [MyLib/RC_Config.h](MyLib/RC_Config.h) |
-| PID、低通、控制周期、超时及翻转保护 | [MyLib/FlightControlConfig.h](MyLib/FlightControlConfig.h) |
-| 电调引脚和脉宽范围 | [MyLib/BLDC.h](MyLib/BLDC.h) |
-| 电调 PWM 频率 | [MyLib/BLDC.c](MyLib/BLDC.c) |
-| MPU 量程、灵敏度和寄存器初始化 | [MyLib/GY86.h](MyLib/GY86.h)、[MyLib/GY86.c](MyLib/GY86.c) |
-| Madgwick beta 和姿态数据有效范围 | [MyLib/Attitude.h](MyLib/Attitude.h) |
-| 加速度校准模式及比例系数 | [MyLib/ReadPeripherals.h](MyLib/ReadPeripherals.h) |
-| 串口引脚、波特率及遥测定点比例 | [MyLib/UART_Set.h](MyLib/UART_Set.h)、[MyLib/ANO.h](MyLib/ANO.h) |
+| 遥控通道、方向、死区、角度/转速目标范围 | [Firmware/Control/RC_Config.h](Firmware/Control/RC_Config.h) |
+| PID、低通、控制周期、超时及翻转保护 | [Firmware/Control/FlightControlConfig.h](Firmware/Control/FlightControlConfig.h) |
+| 电调引脚和脉宽范围 | [Firmware/Drivers/BLDC.h](Firmware/Drivers/BLDC.h) |
+| 电调 PWM 频率 | [Firmware/Drivers/BLDC.c](Firmware/Drivers/BLDC.c) |
+| MPU 量程、灵敏度和寄存器初始化 | [Firmware/Drivers/GY86.h](Firmware/Drivers/GY86.h)、[Firmware/Drivers/GY86.c](Firmware/Drivers/GY86.c) |
+| Madgwick beta 和姿态数据有效范围 | [Firmware/Algorithms/Attitude.h](Firmware/Algorithms/Attitude.h) |
+| 加速度校准模式及比例系数 | [Firmware/Services/ReadPeripherals.h](Firmware/Services/ReadPeripherals.h) |
+| 串口引脚、波特率及遥测定点比例 | [Firmware/Drivers/UART_Set.h](Firmware/Drivers/UART_Set.h)、[Firmware/Communication/ANO.h](Firmware/Communication/ANO.h) |
 
 遥控与 BLDC 的最小、最大和停止脉宽必须一致，`main.c` 对此有编译期检查。改变 IMU 量程时需要同时更新换算常量；改变安装方向时需要统一传感器坐标、姿态符号、控制反馈和电机混控。
 

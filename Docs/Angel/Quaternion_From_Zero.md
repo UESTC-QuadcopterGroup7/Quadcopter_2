@@ -166,7 +166,7 @@ z = nz sin(θ/2)
 - x、y、z 不是三个欧拉角，也不是转轴本身；它们还乘了半角正弦。
 - 四元数模长必须为 1。
 
-项目 [Quaternion_FromAxisAngle()](../../MyLib/Quaternion.c) 会先求轴长度，再把 `sinf(half)` 除以轴长度，因此调用者不必提前归一化轴。
+项目 [Quaternion_FromAxisAngle()](../../Firmware/Algorithms/Quaternion.c) 会先求轴长度，再把 `sinf(half)` 除以轴长度，因此调用者不必提前归一化轴。
 
 核心代码：
 
@@ -719,10 +719,10 @@ SLERP 会在点积为负时翻转目标四元数符号，选最短路径；很�
 
 ## 源码入口
 
-- [Quaternion.h](../../MyLib/Quaternion.h)：数学约定、类型和接口。
-- [Quaternion.c](../../MyLib/Quaternion.c)：构造、Hamilton 积、旋转、积分、插值。
-- [Attitude.h](../../MyLib/Attitude.h)：融合输入单位、参数和返回标志。
-- [Attitude.c](../../MyLib/Attitude.c)：原始计数转换、初始对准、Madgwick 残差与更新。
-- [ReadPeripherals.c](../../MyLib/ReadPeripherals.c)：采集、校准触发、姿态发布和通信。
+- [Quaternion.h](../../Firmware/Algorithms/Quaternion.h)：数学约定、类型和接口。
+- [Quaternion.c](../../Firmware/Algorithms/Quaternion.c)：构造、Hamilton 积、旋转、积分、插值。
+- [Attitude.h](../../Firmware/Algorithms/Attitude.h)：融合输入单位、参数和返回标志。
+- [Attitude.c](../../Firmware/Algorithms/Attitude.c)：原始计数转换、初始对准、Madgwick 残差与更新。
+- [ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c)：采集、校准触发、姿态发布和通信。
 
 进一步阅读可查 Madgwick 的《An efficient orientation filter for inertial and inertial/magnetic sensor arrays》。阅读其他库前，务必先核对四元数分量顺序、Hamilton/JPL 约定、机体到大地还是反向、NED/NWU/ENU 坐标系；公式长得相似不代表可以直接混用。

@@ -20,7 +20,7 @@
 | `Source/os_time.c` | OSTimeDly, OSTimeDlyHMSM |
 | `Port/os_cpu_a.asm` | OS_CPU_PendSVHandler (上下文切换汇编) |
 | `SEGGER/uCOS-II/os_trace_events.h` | SystemView 追踪宏 |
-| `MyLib/ReadPeripherals.c` | ReadPeripherals_Process (传感器读取) |
+| `Firmware/Services/ReadPeripherals.c` | ReadPeripherals_Process (传感器读取) |
 | `Src/main.c` | AppTaskSensor, AppTaskDebug |
 
 ---

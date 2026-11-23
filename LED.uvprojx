@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER, STM32F401xE</Define>
               <Undefine></Undefine>
-              <IncludePath>.\Drivers\CMSIS\Device\ST\STM32F4xx\Include;.\Drivers\CMSIS\Include;.\Drivers\STM32F4xx_HAL_Driver\Inc;.\Inc;.\MyLib;.\Port;.\Source;.\Config;.\ucCPU;.\ucLib;.\SEGGER\RTT;.\SEGGER\SystemView;.\SEGGER\Config;.\SEGGER\uCOS-II</IncludePath>
+              <IncludePath>.\Drivers\CMSIS\Device\ST\STM32F4xx\Include;.\Drivers\CMSIS\Include;.\Drivers\STM32F4xx_HAL_Driver\Inc;.\Inc;.\Firmware\Drivers;.\Firmware\Algorithms;.\Firmware\Control;.\Firmware\Communication;.\Firmware\Services;.\Port;.\Source;.\Config;.\ucCPU;.\ucLib;.\SEGGER\RTT;.\SEGGER\SystemView;.\SEGGER\Config;.\SEGGER\uCOS-II</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -1038,182 +1038,202 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>MyLib</GroupName>
+          <GroupName>Firmware Drivers</GroupName>
           <Files>
             <File>
               <FileName>GPIO_Set.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\GPIO_Set.h</FilePath>
+              <FilePath>.\Firmware\Drivers\GPIO_Set.h</FilePath>
             </File>
             <File>
               <FileName>PWM_Set.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\PWM_Set.h</FilePath>
+              <FilePath>.\Firmware\Drivers\PWM_Set.h</FilePath>
             </File>
             <File>
               <FileName>MyI2C.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\MyI2C.c</FilePath>
+              <FilePath>.\Firmware\Drivers\MyI2C.c</FilePath>
             </File>
             <File>
               <FileName>Delay.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\Delay.c</FilePath>
+              <FilePath>.\Firmware\Drivers\Delay.c</FilePath>
             </File>
             <File>
               <FileName>Delay.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\Delay.h</FilePath>
+              <FilePath>.\Firmware\Drivers\Delay.h</FilePath>
             </File>
             <File>
               <FileName>MyI2C.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\MyI2C.h</FilePath>
+              <FilePath>.\Firmware\Drivers\MyI2C.h</FilePath>
             </File>
             <File>
               <FileName>GY86.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\GY86.c</FilePath>
+              <FilePath>.\Firmware\Drivers\GY86.c</FilePath>
             </File>
             <File>
               <FileName>GY86.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\GY86.h</FilePath>
-            </File>
-            <File>
-              <FileName>AccelCalibration.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\MyLib\AccelCalibration.c</FilePath>
-            </File>
-            <File>
-              <FileName>AccelCalibration.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\MyLib\AccelCalibration.h</FilePath>
+              <FilePath>.\Firmware\Drivers\GY86.h</FilePath>
             </File>
             <File>
               <FileName>OLED.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\OLED.c</FilePath>
+              <FilePath>.\Firmware\Drivers\OLED.c</FilePath>
             </File>
             <File>
               <FileName>OLED.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\OLED.h</FilePath>
+              <FilePath>.\Firmware\Drivers\OLED.h</FilePath>
             </File>
             <File>
               <FileName>OLED_Font.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\OLED_Font.h</FilePath>
+              <FilePath>.\Firmware\Drivers\OLED_Font.h</FilePath>
             </File>
             <File>
               <FileName>USART_Set.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\USART_Set.h</FilePath>
+              <FilePath>.\Firmware\Drivers\USART_Set.h</FilePath>
             </File>
             <File>
               <FileName>UART_Set.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\UART_Set.h</FilePath>
+              <FilePath>.\Firmware\Drivers\UART_Set.h</FilePath>
             </File>
             <File>
               <FileName>BLDC.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\BLDC.c</FilePath>
+              <FilePath>.\Firmware\Drivers\BLDC.c</FilePath>
             </File>
             <File>
               <FileName>BLDC.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\BLDC.h</FilePath>
+              <FilePath>.\Firmware\Drivers\BLDC.h</FilePath>
             </File>
             <File>
               <FileName>Receive_IC.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\Receive_IC.c</FilePath>
+              <FilePath>.\Firmware\Drivers\Receive_IC.c</FilePath>
             </File>
             <File>
               <FileName>Receive_IC.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\Receive_IC.h</FilePath>
+              <FilePath>.\Firmware\Drivers\Receive_IC.h</FilePath>
             </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Firmware Algorithms</GroupName>
+          <Files>
             <File>
-              <FileName>RC_Config.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\MyLib\RC_Config.h</FilePath>
-            </File>
-            <File>
-              <FileName>RC_Control.c</FileName>
+              <FileName>AccelCalibration.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\RC_Control.c</FilePath>
+              <FilePath>.\Firmware\Algorithms\AccelCalibration.c</FilePath>
             </File>
             <File>
-              <FileName>RC_Control.h</FileName>
+              <FileName>AccelCalibration.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\RC_Control.h</FilePath>
+              <FilePath>.\Firmware\Algorithms\AccelCalibration.h</FilePath>
             </File>
             <File>
               <FileName>PID.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\PID.c</FilePath>
+              <FilePath>.\Firmware\Algorithms\PID.c</FilePath>
             </File>
             <File>
               <FileName>PID.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\PID.h</FilePath>
-            </File>
-            <File>
-              <FileName>FlightControl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\MyLib\FlightControl.c</FilePath>
-            </File>
-            <File>
-              <FileName>FlightControl.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\MyLib\FlightControl.h</FilePath>
-            </File>
-            <File>
-              <FileName>FlightControlConfig.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\MyLib\FlightControlConfig.h</FilePath>
-            </File>
-            <File>
-              <FileName>ReadPeripherals.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\MyLib\ReadPeripherals.c</FilePath>
-            </File>
-            <File>
-              <FileName>ReadPeripherals.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\MyLib\ReadPeripherals.h</FilePath>
-            </File>
-            <File>
-              <FileName>ANO.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\MyLib\ANO.c</FilePath>
-            </File>
-            <File>
-              <FileName>ANO.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\MyLib\ANO.h</FilePath>
+              <FilePath>.\Firmware\Algorithms\PID.h</FilePath>
             </File>
             <File>
               <FileName>Quaternion.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\Quaternion.c</FilePath>
+              <FilePath>.\Firmware\Algorithms\Quaternion.c</FilePath>
             </File>
             <File>
               <FileName>Quaternion.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\Quaternion.h</FilePath>
+              <FilePath>.\Firmware\Algorithms\Quaternion.h</FilePath>
             </File>
             <File>
               <FileName>Attitude.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\MyLib\Attitude.c</FilePath>
+              <FilePath>.\Firmware\Algorithms\Attitude.c</FilePath>
             </File>
             <File>
               <FileName>Attitude.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\MyLib\Attitude.h</FilePath>
+              <FilePath>.\Firmware\Algorithms\Attitude.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Firmware Control</GroupName>
+          <Files>
+            <File>
+              <FileName>RC_Config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Firmware\Control\RC_Config.h</FilePath>
+            </File>
+            <File>
+              <FileName>RC_Control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Firmware\Control\RC_Control.c</FilePath>
+            </File>
+            <File>
+              <FileName>RC_Control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Firmware\Control\RC_Control.h</FilePath>
+            </File>
+            <File>
+              <FileName>FlightControl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Firmware\Control\FlightControl.c</FilePath>
+            </File>
+            <File>
+              <FileName>FlightControl.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Firmware\Control\FlightControl.h</FilePath>
+            </File>
+            <File>
+              <FileName>FlightControlConfig.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Firmware\Control\FlightControlConfig.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Firmware Communication</GroupName>
+          <Files>
+            <File>
+              <FileName>ANO.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Firmware\Communication\ANO.c</FilePath>
+            </File>
+            <File>
+              <FileName>ANO.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Firmware\Communication\ANO.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Firmware Services</GroupName>
+          <Files>
+            <File>
+              <FileName>ReadPeripherals.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Firmware\Services\ReadPeripherals.c</FilePath>
+            </File>
+            <File>
+              <FileName>ReadPeripherals.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Firmware\Services\ReadPeripherals.h</FilePath>
             </File>
           </Files>
         </Group>

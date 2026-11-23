@@ -16,7 +16,7 @@
 
 ## 定时器配置
 
-`MyLib/BLDC.c` 使用 TIM3 产生四路 PWM：
+`Firmware/Drivers/BLDC.c` 使用 TIM3 产生四路 PWM：
 
 ```c
 TIM_Base_CFG(TIM3, 84 - 1, 20000 - 1,
@@ -37,7 +37,7 @@ TIM_Base_CFG(TIM3, 84 - 1, 20000 - 1,
 
 ## 代码接口
 
-`MyLib/BLDC.h` 定义 `BLDC_MIN_US = 1000`、`BLDC_MAX_US = 2000`，以及 `BLDC_OFF_US = BLDC_MIN_US`。停止值仍是持续发送的最小脉宽，并不是关闭 PWM 或断开电源。
+`Firmware/Drivers/BLDC.h` 定义 `BLDC_MIN_US = 1000`、`BLDC_MAX_US = 2000`，以及 `BLDC_OFF_US = BLDC_MIN_US`。停止值仍是持续发送的最小脉宽，并不是关闭 PWM 或断开电源。
 
 `BLDC_SetThrottle_us(pulse_us, idx)` 将脉宽限制在 1000～2000 μs，再写入对应通道：
 

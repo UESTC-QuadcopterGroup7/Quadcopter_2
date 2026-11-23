@@ -3515,7 +3515,7 @@
       <Size>100</Size>
       <ActiveTab>10</ActiveTab>
       <Doc>
-        <Name>.\MyLib\BLDC.c</Name>
+        <Name>.\Firmware\Drivers\BLDC.c</Name>
         <ColumnNumber>13</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>13</CurrentLine>
@@ -3524,7 +3524,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\BLDC.h</Name>
+        <Name>.\Firmware\Drivers\BLDC.h</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>1</CurrentLine>
@@ -3533,7 +3533,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\Receive_IC.h</Name>
+        <Name>.\Firmware\Drivers\Receive_IC.h</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>9</CurrentLine>
@@ -3542,7 +3542,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\GPIO_Set.h</Name>
+        <Name>.\Firmware\Drivers\GPIO_Set.h</Name>
         <ColumnNumber>2</ColumnNumber>
         <TopLine>4</TopLine>
         <CurrentLine>26</CurrentLine>
@@ -3560,7 +3560,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\Receive_IC.c</Name>
+        <Name>.\Firmware\Drivers\Receive_IC.c</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>16</CurrentLine>
@@ -3578,7 +3578,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\GY86.c</Name>
+        <Name>.\Firmware\Drivers\GY86.c</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>1</CurrentLine>
@@ -3587,7 +3587,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\ReadPeripherals.c</Name>
+        <Name>.\Firmware\Services\ReadPeripherals.c</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>1</TopLine>
         <CurrentLine>18</CurrentLine>
@@ -3605,7 +3605,7 @@
         <PaneID>0</PaneID>
       </Doc>
       <Doc>
-        <Name>.\MyLib\Quaternion.c</Name>
+        <Name>.\Firmware\Algorithms\Quaternion.c</Name>
         <ColumnNumber>0</ColumnNumber>
         <TopLine>45</TopLine>
         <CurrentLine>52</CurrentLine>

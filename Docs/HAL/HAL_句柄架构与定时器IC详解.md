@@ -56,7 +56,7 @@
 - 溢出处理：若 `t1 < t0`，说明跨周期，则宽度 `= t1 + (ARR+1) - t0`；`ARR` 可通过 `__HAL_TIM_GET_AUTORELOAD(htim)` 或初始化值获取。
 
 ## 5. 与本项目代码的映射（TIM5 输入捕获）
-- 文件：`MyLib/Receive_IC.c` 用 TIM5 测量遥控脉宽。原始代码在回调中用 `pow(2, i)` 与 `i*4` 判定通道与读值，容易混淆。已修正为：
+- 文件：`Firmware/Drivers/Receive_IC.c` 用 TIM5 测量遥控脉宽。原始代码在回调中用 `pow(2, i)` 与 `i*4` 判定通道与读值，容易混淆。已修正为：
   - 用 `HAL_TIM_ACTIVE_CHANNEL_1..4` 比较 `htim->Channel`（确定中断源），
   - 用 `TIM_CHANNEL_1..4` 读取值与控制通道，
   - 切极性采用“停 → 设 → 启”的安全序列，

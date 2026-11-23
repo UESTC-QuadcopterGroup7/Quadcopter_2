@@ -9,21 +9,21 @@
 
 | 文件 | 作用 |
 |---|---|
-| [MyLib/Quaternion.h](../MyLib/Quaternion.h) | 四元数、三维向量、欧拉角的数据类型与函数声明 |
-| [MyLib/Quaternion.c](../MyLib/Quaternion.c) | 纯数学实现，不访问任何硬件 |
-| [MyLib/Attitude.h](../MyLib/Attitude.h) | Madgwick 滤波器的接口与可调参数 |
-| [MyLib/Attitude.c](../MyLib/Attitude.c) | 目标函数与雅可比矩阵、姿态更新、初始对准、原始计数换算 |
+| [Firmware/Algorithms/Quaternion.h](../../Firmware/Algorithms/Quaternion.h) | 四元数、三维向量、欧拉角的数据类型与函数声明 |
+| [Firmware/Algorithms/Quaternion.c](../../Firmware/Algorithms/Quaternion.c) | 纯数学实现，不访问任何硬件 |
+| [Firmware/Algorithms/Attitude.h](../../Firmware/Algorithms/Attitude.h) | Madgwick 滤波器的接口与可调参数 |
+| [Firmware/Algorithms/Attitude.c](../../Firmware/Algorithms/Attitude.c) | 目标函数与雅可比矩阵、姿态更新、初始对准、原始计数换算 |
 
 改动到的现有文件：
 
 | 文件 | 改动 |
 |---|---|
-| [MyLib/ReadPeripherals.h](../MyLib/ReadPeripherals.h) | 新增 `Attitude_Read_t` 与 `g_Attitude` 共享快照 |
-| [MyLib/ReadPeripherals.c](../MyLib/ReadPeripherals.c) | 采集任务里调用姿态解算，通信任务里发送 `ATT` 帧 |
+| [Firmware/Services/ReadPeripherals.h](../../Firmware/Services/ReadPeripherals.h) | 新增 `Attitude_Read_t` 与 `g_Attitude` 共享快照 |
+| [Firmware/Services/ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c) | 采集任务里调用姿态解算，通信任务里发送 `ATT` 帧 |
 | [Config/app_cfg.h](../Config/app_cfg.h) | 通信任务栈从 512 增加到 768 字，给 `%f` 格式化留余量 |
-| [LED.uvprojx](../LED.uvprojx) | 在 `MyLib` 分组中登记 4 个新文件 |
+| [LED.uvprojx](../../LED.uvprojx) | 在 `Firmware Algorithms` 分组中登记 4 个新文件 |
 
-`.\MyLib` 本来就在头文件搜索路径里，所以不需要再改 Include Paths。
+Keil 的 Include Paths 已包含 `.\Firmware\Algorithms`。
 
 ## 2. 坐标系与符号约定
 
@@ -165,7 +165,7 @@ q  ← q / |q|                          归一化
 - 残差已经为零（`|∇f|` 接近 0）时不施加修正，避免 0/0；
 - 每一步都归一化，所以一阶积分带来的模长误差不会累积。
 
-雅可比矩阵是手写的解析式，见 [Attitude.c](../MyLib/Attitude.c) 里的
+雅可比矩阵是手写的解析式，见 [Attitude.c](../../Firmware/Algorithms/Attitude.c) 里的
 `Attitude_GravityTerms()` 与 `Attitude_MagTerms()`。磁场项求导时把参考向量 `b` 视为常量，
 这与 Madgwick 原文的处理一致。
 
@@ -190,7 +190,7 @@ q  ← q / |q|                          归一化
 
 ### 5.5 主机端数值验证
 
-用 gcc 把 [Quaternion.c](../MyLib/Quaternion.c) 与 [Attitude.c](../MyLib/Attitude.c) 编到 PC 上跑过一组检查：
+用 gcc 把 [Quaternion.c](../../Firmware/Algorithms/Quaternion.c) 与 [Attitude.c](../../Firmware/Algorithms/Attitude.c) 编到 PC 上跑过一组检查：
 
 | 检查 | 结果 |
 |---|---|
@@ -311,10 +311,10 @@ ATT R:0.12 P:-0.05 Y:90.00
 
 ## 10. 代码入口与参考
 
-- [Quaternion.h](../MyLib/Quaternion.h) / [Quaternion.c](../MyLib/Quaternion.c)：四元数数学库。
-- [Attitude.h](../MyLib/Attitude.h) / [Attitude.c](../MyLib/Attitude.c)：Madgwick 滤波器。
-- [ReadPeripherals.c](../MyLib/ReadPeripherals.c)：采集任务中的调用与串口输出。
-- [GY86.h](../MyLib/GY86.h)：量程、1g 计数等传感器参数。
+- [Quaternion.h](../../Firmware/Algorithms/Quaternion.h) / [Quaternion.c](../../Firmware/Algorithms/Quaternion.c)：四元数数学库。
+- [Attitude.h](../../Firmware/Algorithms/Attitude.h) / [Attitude.c](../../Firmware/Algorithms/Attitude.c)：Madgwick 滤波器。
+- [ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c)：采集任务中的调用与串口输出。
+- [GY86.h](../../Firmware/Drivers/GY86.h)：量程、1g 计数等传感器参数。
 
 参考：
 
