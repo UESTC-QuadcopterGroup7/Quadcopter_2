@@ -1,188 +1,158 @@
 #include "main.h"
-#include "GPIO_Set.h"
 #include "Receive_IC.h"
-#include "BLDC.h"
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
-extern uint16_t PWM_IN_Wid[4];
+volatile uint16_t PWM_IN_Wid[RC_CHANNEL_COUNT];
 
-// 并非仅含tim2的通道，也包含tim4的通道
-static uint8_t TIM2_Cap_Status[4] = {0}; // 1代表上升沿捕获
-static uint32_t TIM2_Cap_Val[4][2] = {0}; // 两次捕获的值相减获取脉宽
+static uint8_t s_capture_high[RC_CHANNEL_COUNT];
+static uint32_t s_rising_count[RC_CHANNEL_COUNT];
+static uint32_t s_rising_ms[RC_CHANNEL_COUNT];
+static volatile uint32_t s_updated_ms[RC_CHANNEL_COUNT];
+static volatile uint8_t s_valid_mask;
 
-uint16_t Set_Speed(uint16_t val) {
-	if(val > 2000) val = 2000;
-	else if(val < 1500) val = 1000;
-	else val = (val - 1500) * 2 + 1000;
-	return val;
+void IC_Init(void)
+{
+    GPIO_InitTypeDef gpio = {0};
+    TIM_IC_InitTypeDef capture = {0};
+    uint8_t i;
+
+    for (i = 0u; i < RC_CHANNEL_COUNT; ++i) {
+        PWM_IN_Wid[i] = 0u;
+        s_capture_high[i] = 0u;
+        s_rising_count[i] = 0u;
+        s_rising_ms[i] = 0u;
+        s_updated_ms[i] = 0u;
+    }
+    s_valid_mask = 0u;
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_TIM2_CLK_ENABLE();
+    __HAL_RCC_TIM4_CLK_ENABLE();
+
+    gpio.Pin = IC_PIN_CH1 | IC_PIN_CH2;
+    gpio.Mode = GPIO_MODE_AF_PP;
+    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+    gpio.Pull = GPIO_PULLUP;
+    gpio.Alternate = GPIO_AF1_TIM2;
+    HAL_GPIO_Init(IC_PORT_A, &gpio);
+    gpio.Pin = IC_PIN_CH3;
+    HAL_GPIO_Init(IC_PORT_B, &gpio);
+    gpio.Pin = IC_PIN_CH4;
+    gpio.Alternate = GPIO_AF2_TIM4;
+    HAL_GPIO_Init(IC_PORT_B, &gpio);
+
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 84u - 1u;
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 0xFFFFFFFFu; /* TIM2 为 32 位。 */
+    htim4.Instance = TIM4;
+    htim4.Init.Prescaler = 84u - 1u;
+    htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim4.Init.Period = 0xFFFFu;     /* TIM4 为 16 位。 */
+    if (HAL_TIM_Base_Init(&htim2) != HAL_OK || HAL_TIM_IC_Init(&htim2) != HAL_OK ||
+        HAL_TIM_Base_Init(&htim4) != HAL_OK || HAL_TIM_IC_Init(&htim4) != HAL_OK) {
+        Error_Handler();
+        return;
+    }
+
+    capture.ICFilter = 0x04u;
+    capture.ICPolarity = TIM_ICPOLARITY_RISING;
+    capture.ICPrescaler = TIM_ICPSC_DIV1;
+    capture.ICSelection = TIM_ICSELECTION_DIRECTTI;
+    if (HAL_TIM_IC_ConfigChannel(&htim2, &capture, TIM_CHANNEL_1) != HAL_OK ||
+        HAL_TIM_IC_ConfigChannel(&htim2, &capture, TIM_CHANNEL_2) != HAL_OK ||
+        HAL_TIM_IC_ConfigChannel(&htim2, &capture, TIM_CHANNEL_3) != HAL_OK ||
+        HAL_TIM_IC_ConfigChannel(&htim4, &capture, TIM_CHANNEL_2) != HAL_OK) {
+        Error_Handler();
+        return;
+    }
+
+    HAL_NVIC_SetPriority(TIM2_IRQn, 2u, 0u);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+    HAL_NVIC_SetPriority(TIM4_IRQn, 2u, 0u);
+    HAL_NVIC_EnableIRQ(TIM4_IRQn);
+    if (HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1) != HAL_OK ||
+        HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2) != HAL_OK ||
+        HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_3) != HAL_OK ||
+        HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2) != HAL_OK) {
+        Error_Handler();
+    }
 }
 
-void IC_Init(void) {
-	__HAL_RCC_GPIOA_CLK_ENABLE();
-	__HAL_RCC_GPIOB_CLK_ENABLE();
-	__HAL_RCC_TIM2_CLK_ENABLE();
-	__HAL_RCC_TIM4_CLK_ENABLE();
-	
-	// PA0, PA1 -> TIM2 CH1, CH2
-	GPIO_InitTypeDef GPIO_InitStructure = {0};
-	GPIO_InitStructure.Pin = IC_PIN_CH1 | IC_PIN_CH2;
-	GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-	GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
-	GPIO_InitStructure.Pull = GPIO_PULLUP;
-	GPIO_InitStructure.Alternate = GPIO_AF1_TIM2;
-	HAL_GPIO_Init(IC_PORT_A, &GPIO_InitStructure);
-
-	// PB10 -> TIM2 CH3
-	GPIO_InitStructure.Pin = IC_PIN_CH3;
-	GPIO_InitStructure.Alternate = GPIO_AF1_TIM2;
-	HAL_GPIO_Init(IC_PORT_B, &GPIO_InitStructure);
-
-	// PB7 ->  TIM4 CH2
-	GPIO_InitStructure.Pin = IC_PIN_CH4;
-	GPIO_InitStructure.Alternate = GPIO_AF2_TIM4;
-	HAL_GPIO_Init(IC_PORT_B, &GPIO_InitStructure);
-	
-	//TIM2 配置
-	htim2.Instance = TIM2;
-	htim2.Init.Prescaler = 84 - 1;
-	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim2.Init.Period = 0xFFFFFFFF;
-	if(HAL_TIM_Base_Init(&htim2) != HAL_OK) {
-		return;
-	}
-	if(HAL_TIM_IC_Init(&htim2) != HAL_OK) {
-		return;
-	}
-
-	//TIM4 配置
-	htim4.Instance = TIM4;
-	htim4.Init.Prescaler = 84 - 1;
-	htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim4.Init.Period = 0xFFFFFFFF;
-	if(HAL_TIM_Base_Init(&htim4) != HAL_OK) {
-		return;
-	}
-	if(HAL_TIM_IC_Init(&htim4) != HAL_OK) {
-		return;
-	}
-	
-	//IC 配置
-	TIM_IC_InitTypeDef TIM_IC_InitStructure = {0};
-	TIM_IC_InitStructure.ICFilter = 0x04;
-	TIM_IC_InitStructure.ICPolarity = TIM_ICPOLARITY_RISING; //上升沿捕获
-	TIM_IC_InitStructure.ICPrescaler = TIM_ICPSC_DIV1;
-	TIM_IC_InitStructure.ICSelection = TIM_ICSELECTION_DIRECTTI; //直接映射TIx
-	
-	HAL_TIM_IC_ConfigChannel(&htim2, &TIM_IC_InitStructure, TIM_CHANNEL_1);
-	HAL_TIM_IC_ConfigChannel(&htim2, &TIM_IC_InitStructure, TIM_CHANNEL_2);
-	HAL_TIM_IC_ConfigChannel(&htim2, &TIM_IC_InitStructure, TIM_CHANNEL_3);
-	HAL_TIM_IC_ConfigChannel(&htim4, &TIM_IC_InitStructure, TIM_CHANNEL_2);
-	
-	HAL_NVIC_SetPriority(TIM2_IRQn, 2, 0);
-	HAL_NVIC_EnableIRQ(TIM2_IRQn);
-	HAL_NVIC_SetPriority(TIM4_IRQn, 2, 0);
-	HAL_NVIC_EnableIRQ(TIM4_IRQn);
-	
-	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
-	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
-	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_3);
-	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
+void IC_GetSnapshot(RC_Input_t *input)
+{
+    uint32_t primask;
+    uint8_t i;
+    if (input == 0) return;
+    /* PRIMASK 同时屏蔽 TIM2/TIM4；保持调用前的中断状态。 */
+    primask = __get_PRIMASK();
+    __disable_irq();
+    for (i = 0u; i < RC_CHANNEL_COUNT; ++i) {
+        input->pulse_us[i] = PWM_IN_Wid[i];
+        input->updated_ms[i] = s_updated_ms[i];
+    }
+    input->valid_mask = s_valid_mask;
+    __set_PRIMASK(primask);
 }
 
-// void TIM5_IRQHandler(void) {
-// 	HAL_TIM_IRQHandler(&htim5);
-// }
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+    uint32_t channel, overcapture_flag, count, now_ms, width;
+    uint8_t idx;
+    if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
+        channel = TIM_CHANNEL_1;
+        overcapture_flag = TIM_FLAG_CC1OF;
+        idx = 0u;
+    } else if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
+        channel = TIM_CHANNEL_2;
+        overcapture_flag = TIM_FLAG_CC2OF;
+        idx = 1u;
+    } else if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
+        channel = TIM_CHANNEL_3;
+        overcapture_flag = TIM_FLAG_CC3OF;
+        idx = 2u;
+    } else if (htim->Instance == TIM4 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
+        channel = TIM_CHANNEL_2;
+        overcapture_flag = TIM_FLAG_CC2OF;
+        idx = 3u;
+    } else {
+        return;
+    }
 
-// void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
-// 	uint8_t i;
-// 	if(htim->Instance != TIM5) return;
-// 	for(i = 0; i < 4; i++) {
-// 		if(htim->Channel == (1U << i)) { // 这里是TIM_ACTIVE_CHANNEL
-// 			if(TIM5_Cap_Status[i]) {
-//                 TIM5_Cap_Status[i] = 0;
-// 				TIM5_Cap_Val[i][1] = HAL_TIM_ReadCapturedValue(htim, i * 4); //这里是TIM_CHANNEL
-// 				PWM_IN_Wid[i] = TIM5_Cap_Val[i][1] - TIM5_Cap_Val[i][0];
-// 				TIM_SET_CAPTUREPOLARITY(&htim5, i * 4, TIM_ICPOLARITY_RISING);
-// 			} else {
-// 				TIM5_Cap_Status[i] = 1;
-// 				TIM5_Cap_Val[i][0] = HAL_TIM_ReadCapturedValue(htim, i * 4);
-// 				TIM_SET_CAPTUREPOLARITY(&htim5, i * 4, TIM_ICPOLARITY_FALLING);
-// 			}
-// 		}
-// 	}
-// }
+    if (__HAL_TIM_GET_FLAG(htim, overcapture_flag) != RESET) {
+        __HAL_TIM_CLEAR_FLAG(htim, overcapture_flag);
+        s_capture_high[idx] = 0u;
+        s_valid_mask &= (uint8_t)~(1u << idx);
+        __HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_ICPOLARITY_RISING);
+        return;
+    }
+    count = HAL_TIM_ReadCapturedValue(htim, channel);
+    now_ms = HAL_GetTick();
+    if (s_capture_high[idx] == 0u) {
+        s_rising_count[idx] = count;
+        s_rising_ms[idx] = now_ms;
+        s_capture_high[idx] = 1u;
+        __HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_ICPOLARITY_FALLING);
+        return;
+    }
 
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
-	uint32_t channel;
-	uint8_t idx;
-	if(htim->Instance != TIM2 && htim->Instance != TIM4) return;
-
-	//确认通道选择
-	if(htim->Instance == TIM2) {
-		// 确定是哪个通道触发的中断
-		if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
-			channel = TIM_CHANNEL_1;
-			idx = 0;
-		}
-		else if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
-			channel = TIM_CHANNEL_2;
-			idx = 1;
-		}
-		else if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
-			channel = TIM_CHANNEL_3;
-			idx = 2;
-		}
-		// else if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4) {
-		// 	channel = TIM_CHANNEL_4;
-		// 	idx = 3;
-		// }
-		else {
-			return; // 不是TIM2的通道
-		}
-	}
-	else if(htim->Instance == TIM4) {
-		// 确定是哪个通道触发的中断
-		if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
-			channel = TIM_CHANNEL_2;
-			idx = 3;
-		}
-		else {
-			return; // 不是TIM4的通道
-		}
-	}
-	if(TIM2_Cap_Status[idx]) {
-		// 下降沿捕获 - 计算脉宽
-		TIM2_Cap_Status[idx] = 0;
-		TIM2_Cap_Val[idx][1] = HAL_TIM_ReadCapturedValue(htim, channel);
-			
-		// 计算脉宽 (32位计数器自动处理溢出回绕)
-		if (TIM2_Cap_Val[idx][1] >= TIM2_Cap_Val[idx][0]) {
-			PWM_IN_Wid[idx] = (uint16_t)(TIM2_Cap_Val[idx][1] - TIM2_Cap_Val[idx][0]);
-		} else {
-			// 即使发生回绕，无符号减法也会得到正确结果 (例如: 0x00000010 - 0xFFFFFFF0 = 0x20)
-			PWM_IN_Wid[idx] = (uint16_t)(TIM2_Cap_Val[idx][1] - TIM2_Cap_Val[idx][0]);
-		}
-			
-		// 更新BLDC油门 (索引修正为 1-4)
-		BLDC_SetThrottle_us(Set_Speed(PWM_IN_Wid[idx]), idx + 1);
-
-		// 切换为上升沿捕获
-		HAL_TIM_IC_Stop_IT(htim, channel);
-		__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_ICPOLARITY_RISING);
-		HAL_TIM_IC_Start_IT(htim, channel);
-	} else {
-		// 上升沿捕获 - 记录时间
-		TIM2_Cap_Status[idx] = 1;
-		TIM2_Cap_Val[idx][0] = HAL_TIM_ReadCapturedValue(htim, channel);
-				
-		// 切换为下降沿捕获
-		HAL_TIM_IC_Stop_IT(htim, channel);
-		__HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_ICPOLARITY_FALLING);
-		HAL_TIM_IC_Start_IT(htim, channel);
-	}
+    s_capture_high[idx] = 0u;
+    width = (uint32_t)(count - s_rising_count[idx]);
+    if (htim->Instance == TIM4) {
+        width &= 0xFFFFu; /* 16 位计数器按 65536 回绕，不能当作 32 位处理。 */
+    }
+    PWM_IN_Wid[idx] = (width <= 0xFFFFu) ? (uint16_t)width : 0u;
+    /* 毫秒时间检查拒绝长高电平在 TIM4 多次回绕后伪装成合法脉宽。 */
+    if (width >= RC_VALID_MIN_US && width <= RC_VALID_MAX_US &&
+        (uint32_t)(now_ms - s_rising_ms[idx]) <= (RC_VALID_MAX_US / 1000u + 1u)) {
+        s_updated_ms[idx] = now_ms;
+        s_valid_mask |= (uint8_t)(1u << idx);
+    } else {
+        s_valid_mask &= (uint8_t)~(1u << idx);
+    }
+    /* 只改极性，不停启整个定时器，不在中断内写任何电机输出。 */
+    __HAL_TIM_SET_CAPTUREPOLARITY(htim, channel, TIM_ICPOLARITY_RISING);
 }
-	
-	

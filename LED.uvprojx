@@ -1136,6 +1136,21 @@
               <FilePath>.\MyLib\Receive_IC.h</FilePath>
             </File>
             <File>
+              <FileName>RC_Config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\RC_Config.h</FilePath>
+            </File>
+            <File>
+              <FileName>RC_Control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\MyLib\RC_Control.c</FilePath>
+            </File>
+            <File>
+              <FileName>RC_Control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\MyLib\RC_Control.h</FilePath>
+            </File>
+            <File>
               <FileName>ReadPeripherals.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\MyLib\ReadPeripherals.c</FilePath>

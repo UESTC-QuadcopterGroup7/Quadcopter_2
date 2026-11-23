@@ -64,6 +64,7 @@
 */
 
 #define  APP_CFG_STARTUP_TASK_PRIO         3u
+#define  APP_CFG_CONTROL_TASK_PRIO         5u
 #define  APP_CFG_SENSOR_TASK_PRIO          6u
 #define  APP_CFG_COM_TASK_PRIO             9u
 // #define  APP_CFG_DEBUG_TASK_PRIO          10u
@@ -83,6 +84,7 @@
 */
 
 #define  APP_CFG_STARTUP_TASK_STK_SIZE     256u
+#define  APP_CFG_CONTROL_TASK_STK_SIZE     256u
 #define  APP_CFG_SENSOR_TASK_STK_SIZE      512u
 /* 通信任务要格式化和发送姿态角（snprintf 的 %f 比 %d 占用更多栈），留出余量。 */
 #define  APP_CFG_COM_TASK_STK_SIZE         768u

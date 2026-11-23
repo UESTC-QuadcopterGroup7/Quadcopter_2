@@ -10,11 +10,20 @@
 #include "UART_Set.h"
 #include "ReadPeripherals.h"
 
+#if RC_MOTOR_MIN_US != BLDC_MIN_US || RC_MOTOR_MAX_US != BLDC_MAX_US || \
+    RC_MOTOR_OFF_US != BLDC_OFF_US
+#error RC mixer and BLDC pulse ranges must match
+#endif
+
 TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
-uint16_t PWM_IN_Wid[4];
 
 static OS_STK AppTaskStartStk[APP_CFG_STARTUP_TASK_STK_SIZE];
+#if ACCEL_CAL_MODE == 0
+static OS_STK AppTaskControlStk[APP_CFG_CONTROL_TASK_STK_SIZE];
+static RC_Control_t s_rc_control; /* 调试器查看输入、目标值、解锁状态和四路输出。 */
+static void AppTaskControl(void *p_arg);
+#endif
 static OS_STK AppTaskSensorStk[APP_CFG_SENSOR_TASK_STK_SIZE];
 static OS_STK APPTaskComStk[APP_CFG_COM_TASK_STK_SIZE];
 // static OS_STK AppTaskDebugStk[APP_CFG_DEBUG_TASK_STK_SIZE];
@@ -84,17 +93,19 @@ int main(void)
 static void BSP_Init(void)
 {
     // OLED_Init();
-    IC_Init();
 #if ACCEL_CAL_MODE == 0
     BLDC_Init();
 #endif
+    IC_Init();
     ReadPeripherals_Init();
     UART1_FULL_INIT(115200); // must 115200 baudrate
 }
 
 static void AppTaskStart(void *p_arg)
 {
-    // INT8U err;
+#if ACCEL_CAL_MODE == 0
+    INT8U err;
+#endif
 
     (void)p_arg;
 
@@ -111,6 +122,13 @@ static void AppTaskStart(void *p_arg)
     BLDC_SetThrottle_us(BLDC_MIN_US, 3);
     BLDC_SetThrottle_us(BLDC_MIN_US, 4);
     OSTimeDlyHMSM(0, 0, 5, 0);
+
+    if (OSTaskCreate(AppTaskControl, (void *)0,
+                     &AppTaskControlStk[APP_CFG_CONTROL_TASK_STK_SIZE - 1],
+                     APP_CFG_CONTROL_TASK_PRIO) != OS_ERR_NONE) {
+        Error_Handler();
+    }
+    OSTaskNameSet(APP_CFG_CONTROL_TASK_PRIO, (INT8U *)(void *)"AppTaskControl", &err);
 #endif
 
     OSTaskCreate(AppTaskSensor,
@@ -132,6 +150,24 @@ static void AppTaskStart(void *p_arg)
         OSTimeDlyHMSM(0, 0, 1, 0);
     }
 }
+
+#if ACCEL_CAL_MODE == 0
+static void AppTaskControl(void *p_arg)
+{
+    RC_Input_t input;
+    uint8_t i;
+    (void)p_arg;
+    RC_Control_Init(&s_rc_control);
+    while (1) {
+        IC_GetSnapshot(&input);
+        RC_Control_Update(&s_rc_control, &input, HAL_GetTick());
+        for (i = 0u; i < RC_MOTOR_COUNT; ++i) {
+            BLDC_SetThrottle_us(s_rc_control.motor_us[i], (uint8_t)(i + 1u));
+        }
+        OSTimeDlyHMSM(0, 0, 0, 5);
+    }
+}
+#endif
 
 static void AppTaskSensor(void *p_arg)
 {

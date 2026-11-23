@@ -5,6 +5,8 @@
 > **调试工具链**: Keil MDK + SEGGER J-Link + SystemView  
 > **版本**: SystemView Target Source 3.32
 
+遥控器通道分配、自动回中油门、已确认的电机位置、X 型混控及拆桨操作见 [遥控器到电机映射](Docs/Control/遥控器到电机映射.md)。
+
 ---
 
 ## 目录
@@ -73,6 +75,7 @@ Quadcopter_2/
 │   ├── GY86.c/h                     #   MPU6050 陀螺仪/加速度计 (I2C)
 │   ├── OLED.c/h                     #   OLED 显示屏
 │   ├── Receive_IC.c/h               #   输入捕获 (PWM 遥控器信号读取)
+│   ├── RC_Control.c/h / RC_Config.h  #   遥控归一化、目标姿态、解锁及 X 型电机混控
 │   ├── BMP180.c/h                   #   气压计
 │   ├── MyI2C.c/h                    #   I2C 软件模拟
 │   ├── Delay.c/h                    #   延时函数

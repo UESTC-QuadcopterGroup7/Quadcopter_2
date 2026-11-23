@@ -16,7 +16,8 @@ static inline uint16_t clamp_u16(uint16_t v, uint16_t lo, uint16_t hi)
 void BLDC_Init(void)
 {
     // 使能时钟
-    __HAL_RCC_GPIOB_CLK_ENABLE();   // 默认映射在 GPIOB，可按需修改
+    __HAL_RCC_GPIOA_CLK_ENABLE();   // CH1/CH2 在 GPIOA，CH3/CH4 在 GPIOB
+    __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_TIM3_CLK_ENABLE();    // 使用 TIM3 产生 PWM
 
     // PWM 引脚复用到 TIM3_CHx（50Hz伺服脉冲：1~2ms）
@@ -66,16 +67,16 @@ void BLDC_SetThrottle_us(uint16_t pulse_us, uint8_t idx)
     uint16_t duty = clamp_u16(pulse_us, BLDC_MIN_US, BLDC_MAX_US);
     switch(idx) {
         case 1:
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
+            __HAL_TIM_SET_COMPARE(&htim3, BLDC_PWM_CHANNEL_1, duty);
             break;
         case 2:
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty);
+            __HAL_TIM_SET_COMPARE(&htim3, BLDC_PWM_CHANNEL_2, duty);
             break;
         case 3:
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, duty);
+            __HAL_TIM_SET_COMPARE(&htim3, BLDC_PWM_CHANNEL_3, duty);
             break;
         case 4:
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty);
+            __HAL_TIM_SET_COMPARE(&htim3, BLDC_PWM_CHANNEL_4, duty);
             break;
         default:
             break;
