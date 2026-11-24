@@ -68,6 +68,22 @@ static int16_t ANO_Quantize(float value, float lsb)
     return (int16_t)(scaled >= 0.0f ? (scaled + 0.5f) : (scaled - 0.5f));
 }
 
+static void ANO_WriteI16LE(uint8_t *out, int16_t value)
+{
+    uint16_t bits = (uint16_t)value;
+
+    out[0] = (uint8_t)bits;
+    out[1] = (uint8_t)(bits >> 8);
+}
+
+static void ANO_WriteU32LE(uint8_t *out, uint32_t bits)
+{
+    out[0] = (uint8_t)bits;
+    out[1] = (uint8_t)(bits >> 8);
+    out[2] = (uint8_t)(bits >> 16);
+    out[3] = (uint8_t)(bits >> 24);
+}
+
 /* ---- 通用帧 ------------------------------------------------------------ */
 
 void ANO_SendInt16s(uint8_t fun, const int16_t *values, uint8_t count)
@@ -80,8 +96,7 @@ void ANO_SendInt16s(uint8_t fun, const int16_t *values, uint8_t count)
     }
 
     for (i = 0; i < (uint16_t)count; i++) {
-        payload[2u * i]      = (uint8_t)(values[i] & 0xFF);
-        payload[2u * i + 1u] = (uint8_t)(((uint16_t)values[i] >> 8) & 0xFF);
+        ANO_WriteI16LE(&payload[2u * i], values[i]);
     }
 
     ANO_SendPacket(fun, payload, (uint8_t)(2u * count));
@@ -102,10 +117,7 @@ void ANO_SendFloats(uint8_t fun, const float *values, uint8_t count)
 
     for (i = 0; i < (uint16_t)count; i++) {
         cvt.f = values[i];
-        payload[4u * i]      = (uint8_t)(cvt.u & 0xFF);
-        payload[4u * i + 1u] = (uint8_t)((cvt.u >> 8) & 0xFF);
-        payload[4u * i + 2u] = (uint8_t)((cvt.u >> 16) & 0xFF);
-        payload[4u * i + 3u] = (uint8_t)((cvt.u >> 24) & 0xFF);
+        ANO_WriteU32LE(&payload[4u * i], cvt.u);
     }
 
     ANO_SendPacket(fun, payload, (uint8_t)(4u * count));
@@ -115,42 +127,43 @@ void ANO_SendFloats(uint8_t fun, const float *values, uint8_t count)
 
 void ANO_SendFC_AccGyr(const float acc_ms2[3], const float gyr_dps[3], uint8_t shock)
 {
-    int16_t v[7];
+    uint8_t payload[13];
+    uint8_t axis;
 
-    v[0] = ANO_Quantize(acc_ms2[0], ANO_LSB_ACC);
-    v[1] = ANO_Quantize(acc_ms2[1], ANO_LSB_ACC);
-    v[2] = ANO_Quantize(acc_ms2[2], ANO_LSB_ACC);
-    v[3] = ANO_Quantize(gyr_dps[0], ANO_LSB_GYR);
-    v[4] = ANO_Quantize(gyr_dps[1], ANO_LSB_GYR);
-    v[5] = ANO_Quantize(gyr_dps[2], ANO_LSB_GYR);
-    v[6] = (int16_t)shock;
+    for (axis = 0u; axis < 3u; ++axis) {
+        ANO_WriteI16LE(&payload[2u * axis], ANO_Quantize(acc_ms2[axis], ANO_LSB_ACC));
+        ANO_WriteI16LE(&payload[6u + 2u * axis], ANO_Quantize(gyr_dps[axis], ANO_LSB_GYR));
+    }
+    payload[12] = shock;
 
-    ANO_SendInt16s(ANO_FUN_FC_MOTION, v, 7u);
+    ANO_SendPacket(ANO_FUN_FC_MOTION, payload, sizeof(payload));
 }
 
-void ANO_SendFC_MagBaro(const int16_t mag[3], float alt_m, float temp_c,
+void ANO_SendFC_MagBaro(const int16_t mag[3], int32_t alt_cm, float temp_c,
                         uint8_t sta_bar, uint8_t sta_mag)
 {
-    int16_t v[7];
+    uint8_t payload[14];
+    uint8_t axis;
 
-    v[0] = mag[0];
-    v[1] = mag[1];
-    v[2] = mag[2];
-    v[3] = ANO_Quantize(alt_m, 100.0f);    /* 厘米 */
-    v[4] = ANO_Quantize(temp_c, 100.0f);   /* 0.01 °C */
-    v[5] = (int16_t)sta_bar;
-    v[6] = (int16_t)sta_mag;
+    for (axis = 0u; axis < 3u; ++axis) {
+        ANO_WriteI16LE(&payload[2u * axis], mag[axis]);
+    }
+    ANO_WriteU32LE(&payload[6], (uint32_t)alt_cm);
+    ANO_WriteI16LE(&payload[10], ANO_Quantize(temp_c, 10.0f));
+    payload[12] = sta_bar;
+    payload[13] = sta_mag;
 
-    ANO_SendInt16s(ANO_FUN_FC_ENV, v, 7u);
+    ANO_SendPacket(ANO_FUN_FC_ENV, payload, sizeof(payload));
 }
 
 void ANO_SendFC_Attitude(float roll_deg, float pitch_deg, float yaw_deg)
 {
-    int16_t v[3];
+    uint8_t payload[7];
 
-    v[0] = ANO_Quantize(roll_deg, ANO_LSB_ATT);
-    v[1] = ANO_Quantize(pitch_deg, ANO_LSB_ATT);
-    v[2] = ANO_Quantize(yaw_deg, ANO_LSB_ATT);
+    ANO_WriteI16LE(&payload[0], ANO_Quantize(roll_deg, ANO_LSB_ATT));
+    ANO_WriteI16LE(&payload[2], ANO_Quantize(pitch_deg, ANO_LSB_ATT));
+    ANO_WriteI16LE(&payload[4], ANO_Quantize(yaw_deg, ANO_LSB_ATT));
+    payload[6] = 0u; /* FUSION_STA：当前只上报已初始化的姿态角。 */
 
-    ANO_SendInt16s(ANO_FUN_FC_ATT, v, 3u);
+    ANO_SendPacket(ANO_FUN_FC_ATT, payload, sizeof(payload));
 }

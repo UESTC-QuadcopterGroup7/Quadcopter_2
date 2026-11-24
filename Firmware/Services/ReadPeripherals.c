@@ -574,8 +574,7 @@ void ReadPeripherals_Transmit(void)
      * 那些通道（通道名和顺序都是协议写死的），同时也是“飞控状态”页
      * 3D 模型、罗盘和 ROL/PIT/YAW 的数据源。
      *
-     * 注意：这里不依赖 att.fresh，传感器一上电就开始发，避免没有姿态时
-     * 整个串口静默。
+     * 姿态帧和运动帧分别检查 att.fresh 和 mpu.fresh，环境帧按自身节拍发送。
      */
     if (++s_frame_div >= ANO_TICK_DIV) {
         s_frame_div = 0;
@@ -609,7 +608,7 @@ void ReadPeripherals_Transmit(void)
             mag[0] = hmc.mx;
             mag[1] = hmc.my;
             mag[2] = hmc.mz;
-            ANO_SendFC_MagBaro(mag, 0.0f, 0.0f, 0u,
+            ANO_SendFC_MagBaro(mag, 0, 0.0f, 0u,
                                (uint8_t)((g_HmcAddressAck == 0) ? 1u : 0u));
         }
     }

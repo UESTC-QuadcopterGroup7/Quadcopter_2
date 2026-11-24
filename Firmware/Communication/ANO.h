@@ -32,14 +32,14 @@
 void ANO_SendInt16s(uint8_t fun, const int16_t *values, uint8_t count);
 void ANO_SendFloats(uint8_t fun, const float *values, uint8_t count);
 
-/* 0x01：加速度(m/s²) + 角速度(°/s) + 震动标志 */
+/* 0x01：加速度(m/s²) + 角速度(°/s) + 1 字节震动状态 */
 void ANO_SendFC_AccGyr(const float acc_ms2[3], const float gyr_dps[3], uint8_t shock);
 
-/* 0x02：磁力原始值 + 气压高度(m) + 温度(°C) + 两个状态字 */
-void ANO_SendFC_MagBaro(const int16_t mag[3], float alt_m, float temp_c,
+/* 0x02：磁力原始值 + 气压高度(cm) + 温度(°C) + 两个单字节状态 */
+void ANO_SendFC_MagBaro(const int16_t mag[3], int32_t alt_cm, float temp_c,
                         uint8_t sta_bar, uint8_t sta_mag);
 
-/* 0x03：姿态角（度） */
+/* 0x03：姿态角（度）+ 1 字节融合状态 */
 void ANO_SendFC_Attitude(float roll_deg, float pitch_deg, float yaw_deg);
 
 #endif

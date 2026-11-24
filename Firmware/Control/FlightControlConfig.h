@@ -17,10 +17,10 @@
 #define FC_MAX_RP_RATE_DPS            120.0f
 
 /* 三轴角速度内环：Kp [us/(deg/s)]，Ki [us/deg]，Kd [us/(deg/s^2)]。 */
-#define FC_ROLL_RATE_KP               0.80f
+#define FC_ROLL_RATE_KP               0.88f
 #define FC_ROLL_RATE_KI               0.25f
 #define FC_ROLL_RATE_KD               0.005f
-#define FC_PITCH_RATE_KP              0.80f
+#define FC_PITCH_RATE_KP              0.88f
 #define FC_PITCH_RATE_KI              0.25f
 #define FC_PITCH_RATE_KD              0.005f
 #define FC_YAW_RATE_KP                1.00f

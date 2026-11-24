@@ -25,8 +25,8 @@
 #define RC_BENCH_WAIT_MS        10000u
 // 从自动启动开始计时，运行满 30 秒后停机。
 #define RC_BENCH_RUN_MS         30000u
-// 电机混控的基础 PWM 脉宽，在 1000–2000 µs 的油门范围内对应 15% 的油门指令。PID 会按姿态误差调整各电机的脉宽。
-#define RC_BENCH_BASE_US        1150u
+// 台架启动后的基础 PWM 脉宽。PID 在此基础上调整各电机的脉宽。
+#define RC_BENCH_BASE_US        1500u
 
 /* 接收机数组下标：0=CH1，1=CH2，2=CH3，3=CH4。 */
 #ifndef RC_ROLL_CHANNEL

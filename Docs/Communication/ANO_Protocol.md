@@ -3,7 +3,7 @@
 本文说明本项目新增的 `Firmware/Communication/ANO.c` / `Firmware/Communication/ANO.h`：为什么要发二进制帧、帧长什么样、每个字段的单位、
 三条飞控帧分别喂给上位机的哪些通道、`ReadPeripherals.c` 怎么调用、以及现在还没做什么。
 
-本文只描述当前源码状态，参数是按公开资料与实测现象估的，不代表已逐字节对照官方手册验证。
+固定帧字段格式见[《匿名通信协议 V7》第 7 页](https://github.com/FDogeLover/AUV/blob/main/docs/reference-materials/01-protocols/%E5%8C%BF%E5%90%8D%E9%80%9A%E4%BF%A1%E5%8D%8FV7.pdf)。
 
 ## 1. 为什么需要这个模块
 
@@ -85,18 +85,10 @@ for (i = 0; i < 4 + LEN; i++) {      /* 从 0xAA 一直到最后一个数据字�
 | +90.00° → 9000 | `0x2328` | `28 23` |
 
 ```
-AA FF 03 06 E8 03 0C FE 28 23 F2 F9
-│  │  │  │  └──────┬──────┘  │  │
-│  │  │  │         │         │  └─ ADD = 0xF9
-│  │  │  │         │         └──── SUM = 0xF2
-│  │  │  │         └────────────── 3 × int16 = 6 字节
-│  │  │  └──────────────────────── LEN = 6
-│  │  └─────────────────────────── 功能码 0x03（姿态）
-│  └────────────────────────────── 目标地址 0xFF
-└───────────────────────────────── 帧头 0xAA
+AA FF 03 07 E8 03 0C FE 28 23 00 F3 F3
 ```
 
-调试时截一帧下来，用这张表逐字节对，比看代码快。
+`07` 是数据长度。三个角度占 6 字节，最后的 `00` 是融合状态。两个校验字节均为 `F3`。
 
 ## 3. 发送的三条帧
 
@@ -104,11 +96,11 @@ AA FF 03 06 E8 03 0C FE 28 23 F2 F9
 对应上位机「波形显示」里 `FC_ACC_*`、`FC_GYR_*`、`FC_MAG_*`、`FC_ATT_*` 那些通道名。
 「飞控状态」页的 3D 模型、罗盘、`ROL/PIT/YAW` 也吃这几帧。
 
-| 功能码 | 长度 | 频率 | 字段（顺序固定） | 上位机通道 |
+| 功能码 | 数据长度 | 发送间隔 | 字段（顺序固定） | 上位机通道 |
 |---|---|---|---|---|
-| `0x01` | 14 | 50 Hz | acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, shock | `FC_ACC_X/Y/Z`、`FC_GYR_X/Y/Z`、`FC_STA_Shock` |
-| `0x02` | 14 | 25 Hz | mag_x, mag_y, mag_z, alt, temp, sta_bar, sta_mag | `FC_MAG_X/Y/Z`、`FC_ALT_BAR`、`FC_SensorTMP`、`FC_STA_BAR/MAG` |
-| `0x03` | 6 | 50 Hz | roll, pitch, yaw | `FC_ATT_ROL/PIT/YAW` |
+| `0x01` | 13 | 2 拍 | 三轴加速度和角速度（各 int16），震动状态（uint8） | `FC_ACC_X/Y/Z`、`FC_GYR_X/Y/Z`、`FC_STA_Shock` |
+| `0x02` | 14 | 4 拍 | 三轴磁力（各 int16），高度（int32，cm），温度（int16，0.1 °C/LSB），气压计和磁力计状态（各 uint8） | `FC_MAG_X/Y/Z`、`FC_ALT_BAR`、`FC_SensorTMP`、`FC_STA_BAR/MAG` |
+| `0x03` | 7 | 1 拍 | 横滚、俯仰、偏航（各 int16），融合状态（uint8，当前填 0） | `FC_ATT_ROL/PIT/YAW` |
 
 单位换算集中在 [ANO.h](../../Firmware/Communication/ANO.h) 的三个宏里：
 
@@ -132,7 +124,7 @@ AA FF 03 06 E8 03 0C FE 28 23 F2 F9
 | `ANO_SendInt16s(fun, values, count)` | 把 `count` 个 int16 小端打包成 `fun` 帧，`count ≤ 10` |
 | `ANO_SendFloats(fun, values, count)` | 同上，float 版本；当前未被调用，留给 `0xF1` 用户帧 |
 | `ANO_SendFC_AccGyr(acc_m_s2[3], gyr_dps[3], shock)` | 组 `0x01` 帧，内部完成物理量 → 定点 |
-| `ANO_SendFC_MagBaro(mag[3], alt_m, temp_c, sta_bar, sta_mag)` | 组 `0x02` 帧 |
+| `ANO_SendFC_MagBaro(mag[3], alt_cm, temp_c, sta_bar, sta_mag)` | 组 `0x02` 帧 |
 | `ANO_SendFC_Attitude(roll_deg, pitch_deg, yaw_deg)` | 组 `0x03` 帧 |
 
 三条 `ANO_SendFC_*` 是给调用方省事的糖：上层只负责把原始计数换成物理量，
@@ -144,7 +136,7 @@ AA FF 03 06 E8 03 0C FE 28 23 F2 F9
 ANO_SendFC_Attitude(roll, pitch, yaw)
         │  ANO_Quantize(角度, ANO_LSB_ATT)   ← 四舍五入 + 饱和到 int16
         ▼
-ANO_SendInt16s(0x03, v, 3)                  ← 打包小端
+写入三个小端角度和一个融合状态字节
         ▼
 ANO_SendPacket(fun, payload, len)           ← 加帧头/长度/两种校验
         ▼
@@ -161,35 +153,34 @@ GY-86(I2C) ──► ReadPeripherals_Process() ──► g_MPU6050 / g_HMC5883L
                         │                    g_Attitude（Madgwick 四元数 → 欧拉角）
                         └──────────────┐
                                        ▼
-                    ReadPeripherals_Transmit()（每 10 ms 一次）
+                    ReadPeripherals_Transmit()（每个通信循环）
                         │
-                        ├─ 每拍     → 0x03（100 Hz，姿态，最先发）
-                        ├─ 每 2 拍  → 0x01（50 Hz，加速度/角速度）
-                        └─ 每 4 拍  → 0x02（25 Hz，磁力/气压）
+                        ├─ 每拍     → 0x03（姿态，最先发）
+                        ├─ 每 2 拍  → 0x01（加速度/角速度）
+                        └─ 每 4 拍  → 0x02（磁力/气压）
                                        │
                                   UART1 115200
                                        ▼
                               匿名上位机 V7
 ```
 
-发帧不依赖 `att.fresh`：传感器一上电就开始发 `0x01`，姿态有效后才追加 `0x03`。
-这样即使姿态初始化失败，串口也不会整条静默——便于区分「没发」和「没解析」。
+`0x03` 在 `att.fresh` 有效时发送，`0x01` 在 `mpu.fresh` 有效时发送。`0x02` 按自身节拍发送。
+通信任务发送后延时约 5 ms，实际频率还取决于串口耗时和任务调度。
 
 ### 5.1 带宽
 
+以通信循环平均 10 ms 为例：
+
 | 项 | 计算 | 结果 |
 |---|---|---|
-| `0x03` | 12 B × 100 | 1200 B/s |
-| `0x01` | 20 B × 50 | 1000 B/s |
+| `0x03` | 13 B × 100 | 1300 B/s |
+| `0x01` | 19 B × 50 | 950 B/s |
 | `0x02` | 20 B × 25 | 500 B/s |
-| 合计 | | ≈ 2.7 kB/s |
+| 合计 | | 2.75 kB/s |
 
-115200 8N1 的可用带宽约 11.5 kB/s，占用约 23%。
+115200 8N1 的可用带宽约 11.5 kB/s，三条固定帧占约 24%。
 
-每个 `HAL_UART_Transmit` 都是阻塞的。每拍先发 `0x03`（12 B ≈ 1.0 ms），
-每隔一拍追加 `0x01`（20 B ≈ 1.7 ms），每隔四拍追加 `0x02`（20 B ≈ 1.7 ms），
-最坏一拍合计约 4.5 ms，仍在 10 ms 周期之内。姿态帧排在最前面，是为了不让加速度帧
-把姿态数据的发出时刻往后推。
+每次 `HAL_UART_Transmit` 都是阻塞发送。三个固定帧同拍发送时，52 字节在线路上约需 4.5 ms。姿态帧优先发送。
 
 ### 5.2 端到端延迟
 
@@ -226,7 +217,7 @@ GY-86(I2C) ──► ReadPeripherals_Process() ──► g_MPU6050 / g_HMC5883L
 | 位置 | 宏 | 默认 | 作用 |
 |---|---|---|---|
 | [ANO.c](../../Firmware/Communication/ANO.c) | `ANO_TARGET_ADDR` | `0xFF` | 目标地址；个别固件版本认 `0xAF`，改这一行即可 |
-| [ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c) | `ANO_TICK_DIV` | 1 | 每 N 拍发一帧姿态；1 → 100 Hz |
+| [ReadPeripherals.c](../../Firmware/Services/ReadPeripherals.c) | `ANO_TICK_DIV` | 1 | 每 N 拍进入一次固定帧的发送流程 |
 | [ANO.h](../../Firmware/Communication/ANO.h) | `ANO_LSB_ACC/GYR/ATT` | 100/10/100 | 定点比例 |
 
 文本行（`MPU` / `HMC` / `ATT`）目前整体包在 `#if 0` 里，不再发送，

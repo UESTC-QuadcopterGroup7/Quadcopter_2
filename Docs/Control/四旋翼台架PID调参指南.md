@@ -8,8 +8,8 @@
 
 | 轴 | 角度外环 P | 角速度 Kp | 角速度 Ki | 角速度 Kd |
 | --- | --- | --- | --- | --- |
-| 横滚 Roll | `FC_ROLL_ANGLE_KP` = `4.0` | `FC_ROLL_RATE_KP` = `0.80` | `FC_ROLL_RATE_KI` = `0.25` | `FC_ROLL_RATE_KD` = `0.005` |
-| 俯仰 Pitch | `FC_PITCH_ANGLE_KP` = `4.0` | `FC_PITCH_RATE_KP` = `0.80` | `FC_PITCH_RATE_KI` = `0.25` | `FC_PITCH_RATE_KD` = `0.005` |
+| 横滚 Roll | `FC_ROLL_ANGLE_KP` = `4.0` | `FC_ROLL_RATE_KP` = `0.88` | `FC_ROLL_RATE_KI` = `0.25` | `FC_ROLL_RATE_KD` = `0.005` |
+| 俯仰 Pitch | `FC_PITCH_ANGLE_KP` = `4.0` | `FC_PITCH_RATE_KP` = `0.88` | `FC_PITCH_RATE_KI` = `0.25` | `FC_PITCH_RATE_KD` = `0.005` |
 | 偏航 Yaw | 无 | `FC_YAW_RATE_KP` = `1.00` | `FC_YAW_RATE_KI` = `0.20` | `FC_YAW_RATE_KD` = `0.00` |
 
 表中是仓库当前的起始值。参数在 `Firmware/Control/FlightControlConfig.h`，修改后需要重新编译并烧录，再重复同一轮测试。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h)
@@ -21,7 +21,7 @@
 | 轴与参数 | 数量级 | 当前初值 | 台架微调参考范围 | 单次步长（按初值的 5%～10% 换算） |
 | --- | --- | --- | --- | --- |
 | 横滚、俯仰 `ANGLE_KP` | `10^0`，个位数 | `4.0` | `3.0–5.0` | `0.20–0.40` |
-| 横滚、俯仰 `RATE_KP` | `10^0`，接近 `1` | `0.80` | `0.60–1.00` | `0.04–0.08` |
+| 横滚、俯仰 `RATE_KP` | `10^0`，接近 `1` | `0.88` | `0.66–1.10` | `0.044–0.088` |
 | 横滚、俯仰 `RATE_KI` | `10^-1`，十分位 | `0.25` | `0.19–0.31` | `0.0125–0.025` |
 | 横滚、俯仰 `RATE_KD` | `10^-3`，千分之几 | `0.005` | `0.00375–0.00625` | `0.00025–0.00050` |
 | 偏航 `RATE_KP` | `10^0`，接近 `1` | `1.00` | `0.75–1.25` | `0.05–0.10` |
@@ -34,7 +34,7 @@
 
 1. **先拆桨查方向。** 水平、静止上电完成零偏校准，核对姿态显示、电机编号、旋向和纠偏 PWM。M1 右后、M2 右前、M3 左前、M4 左后。拆桨阶段用来确认信号和混控方向，观察实际回正需要机体能绕被测轴运动。[电机与螺旋桨旋向](../Hardware/四轴电机与螺旋桨旋向.md)
 2. **每次让台架只允许被测轴在受限范围内转动。** 台架固定在稳固底座上，限制机体平移，留出桨叶净空并隔离人员。上电前确认能在桨叶范围外切断动力。带桨时通过台架机构施加小扰动，或用遥控给小幅指令。停机并断开动力后再调整夹具。刚性夹紧的轴只能检查输出方向，台架摩擦、配重和线缆拉力也会改变回正表现。
-3. **选测试方式。** 当前 `RC_RECEIVER_ENABLED = 0`，台架模式启动检查连续通过 `10 s` 后自动开转，默认运行 `30 s`，基础 PWM 为 `1150 µs`，三轴目标均为零。这适合看受扰后能否回正或制动。需要主动给某一轴目标时，使用 `RC_RECEIVER_ENABLED = 1`，把该轴对应的 `RC_TUNING_LOCK_ROLL`、`RC_TUNING_LOCK_PITCH` 或 `RC_TUNING_LOCK_YAW` 改为 `0`，另外两轴保持目标锁定。台架模式始终使用零目标。 [RC_Config.h](../../Firmware/Control/RC_Config.h) · [RC_Control.c](../../Firmware/Control/RC_Control.c)
+3. **选测试方式。** 当前 `RC_RECEIVER_ENABLED = 0`，台架模式启动检查连续通过 `10 s` 后自动开转，默认运行 `30 s`，基础 PWM 由 `RC_BENCH_BASE_US` 设置，三轴目标均为零。这适合看受扰后能否回正或制动。需要主动给某一轴目标时，使用 `RC_RECEIVER_ENABLED = 1`，把该轴对应的 `RC_TUNING_LOCK_ROLL`、`RC_TUNING_LOCK_PITCH` 或 `RC_TUNING_LOCK_YAW` 改为 `0`，另外两轴保持目标锁定。台架模式始终使用零目标。 [RC_Config.h](../../Firmware/Control/RC_Config.h) · [RC_Control.c](../../Firmware/Control/RC_Control.c)
 
 ## 3. 分别怎么观察横滚、俯仰和偏航
 
@@ -64,7 +64,7 @@
 ## 5. 记录哪些数据
 
 - **看角速度跟踪。** 同时记录被测轴的 `rate_setpoint_dps` 和 `filtered_rate_dps`，再看 `rate_pid[i].p_term`、`i_term`、`d_term` 与 `correction_us[i]`。下标 `0`、`1`、`2` 分别对应横滚、俯仰和偏航。角速度跟踪正常后，再用实测横滚、俯仰角判断外环。
-- **先确认 I 项有机会工作。** `FC_INTEGRAL_MIN_THROTTLE = 0.10`，低于 10% 的归一化油门时会冻结积分。默认的 `1150 µs` 对应 15% 油门，满足这一门槛。电调是否起转、实际有多少推力，可从该台架的运行情况单独确认。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h) · [FlightControl.c](../../Firmware/Control/FlightControl.c)
+- **先确认 I 项有机会工作。** `FC_INTEGRAL_MIN_THROTTLE = 0.10`，低于 10% 的归一化油门时会冻结积分。在 1000–2000 µs 的 PWM 范围内，10% 对应 1100 µs。电调起转点和实际推力由台架实测确认。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h) · [FlightControl.c](../../Firmware/Control/FlightControl.c)
 - **用 ANO 看状态，用连续采样看快速振荡。** `0xF1` 飞控诊断帧约每 `200 ms` 发送一次，包含状态码、台架等待时间、反馈有效标志、倾角、四路 PWM、故障锁存和校准计数。判断快速振荡需要连续采集目标、实测和 PID 量。带桨运行期间应保持控制任务连续执行，把断点和暂停检查留到断开动力后。 [main.c](../../Src/main.c)
 
 | 测试轴和动作 | 更改的宏及旧值 → 新值 | 最大过冲和稳定时间 | PWM 是否触限、故障码、备注 |
