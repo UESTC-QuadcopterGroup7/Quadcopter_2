@@ -10,6 +10,8 @@
 #include "ReadPeripherals.h"
 #include "ANO.h"
 
+#define FC_CONTROL_ENABLED (ACCEL_CAL_MODE == 0 && RC_MOTOR_OUTPUT_ENABLED)
+
 #if RC_MOTOR_MIN_US != BLDC_MIN_US || RC_MOTOR_MAX_US != BLDC_MAX_US || \
     RC_MOTOR_OFF_US != BLDC_OFF_US
 #error RC mixer and BLDC pulse ranges must match
@@ -20,7 +22,7 @@ UART_HandleTypeDef huart1;
 
 static OS_STK AppTaskStartStk[APP_CFG_STARTUP_TASK_STK_SIZE];
 
-#if ACCEL_CAL_MODE == 0
+#if FC_CONTROL_ENABLED
 static OS_STK AppTaskControlStk[APP_CFG_CONTROL_TASK_STK_SIZE];
 static FC_Control_t s_flight_control; /* 闭环目标、PID 各项、状态及 rc.motor_us。 */
 
@@ -98,10 +100,10 @@ int main(void)
 static void BSP_Init(void)
 {
     // OLED_Init();
-#if ACCEL_CAL_MODE == 0
+#if FC_CONTROL_ENABLED
     BLDC_Init();
 #endif
-#if RC_RECEIVER_ENABLED
+#if RC_MOTOR_OUTPUT_ENABLED && RC_RECEIVER_ENABLED
     IC_Init();
 #endif
     ReadPeripherals_Init();
@@ -110,7 +112,7 @@ static void BSP_Init(void)
 
 static void AppTaskStart(void *p_arg)
 {
-#if ACCEL_CAL_MODE == 0
+#if FC_CONTROL_ENABLED
     INT8U err;
 #endif
 
@@ -119,10 +121,10 @@ static void AppTaskStart(void *p_arg)
     OS_CPU_SysTickInitFreq(SystemCoreClock);
     BSP_Init();
 
+#if FC_CONTROL_ENABLED
     // /* 同时校准 TIM3 四路电调；必须全部拆桨，校准完成后注释此调用。 */
     // Calibrate_BLDC_All();
 
-#if ACCEL_CAL_MODE == 0
     /* 四路保持最小油门脉宽，让电调完成上电解锁。 */
     BLDC_SetThrottle_us(BLDC_MIN_US, 1);
     BLDC_SetThrottle_us(BLDC_MIN_US, 2);
@@ -158,7 +160,7 @@ static void AppTaskStart(void *p_arg)
     }
 }
 
-#if ACCEL_CAL_MODE == 0
+#if FC_CONTROL_ENABLED
 
 /// @brief 飞控任务入口，更新飞控状态并写入四路电机 PWM。
 /// @details 初始化飞控后，每轮读取姿态和角速度反馈，遥控模式下同时读取接收机快照。
@@ -240,7 +242,7 @@ static void AppTaskSensor(void *p_arg)
 
 static void APPTaskCom(void *p_arg)
 {
-#if ACCEL_CAL_MODE == 0
+#if FC_CONTROL_ENABLED
     uint32_t diagnostics_last_ms = 0u;
     float diagnostics[10];
     uint8_t i;
@@ -250,7 +252,7 @@ static void APPTaskCom(void *p_arg)
 
     while (1) {
         ReadPeripherals_Transmit();
-#if ACCEL_CAL_MODE == 0
+#if FC_CONTROL_ENABLED
         if ((uint32_t)(HAL_GetTick() - diagnostics_last_ms) >= 200u) {
             diagnostics_last_ms = HAL_GetTick();
             OS_ENTER_CRITICAL();

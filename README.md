@@ -89,6 +89,8 @@ Quadcopter_2/
 
 ### 1.3 启动顺序
 
+以下为启用电机控制时的启动顺序。
+
 ```text
 main
   → HAL_Init / SystemClock_Config
@@ -104,6 +106,8 @@ main
 ```
 
 偏置校准样本至少间隔 10 ms，正常情况下还需约 1 秒。`ACCEL_CAL_MODE=1` 时跳过电机初始化、5 秒等待和控制任务，进入六姿态加速度校准流程。
+
+调匿名上位机时，在 [RC_Config.h](Firmware/Control/RC_Config.h) 将 `RC_MOTOR_OUTPUT_ENABLED` 设为 `0`，重新编译烧录。此时启动传感器和通信任务，通过 USART1（115200）发送姿态和传感器遥测，四路电机 PWM 保持关闭。`0xF1` 电机控制诊断帧随控制任务关闭。结束遥测调试后，设为 `1` 并重新编译烧录即可恢复电机控制。
 
 <a id="drivers"></a>
 
@@ -293,7 +297,7 @@ q_next = normalize(q + q_dot · dt)
 
 | 配置，位于 `ReadPeripherals.h` | 当前值 | 含义 |
 | --- | --- | --- |
-| `ACCEL_CAL_MODE` | 0 | 正常采样与控制；设为 1 时进入六姿态采集并跳过电机控制 |
+| `ACCEL_CAL_MODE` | 0 | 正常采样和姿态解算；设为 1 时进入六姿态采集并跳过电机控制 |
 | `ACCEL_CAL_PARAMS_VALID` | 0 | 当前未应用六姿态比例系数 |
 | `ACCEL_CAL_PARAMS_1G_RAW` | 2048 | 校准参数对应的加速度计量程 |
 | `ACCEL_CAL_SCALE_X/Y/Z` | 1.0 | 比例修正参数，参数有效开关打开后才应用 |

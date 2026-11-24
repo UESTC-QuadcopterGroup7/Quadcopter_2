@@ -7,11 +7,15 @@
 #ifndef RC_CONFIG_H
 #define RC_CONFIG_H
 
-/* 0：关闭接收机采集及遥控解码，启用下面的自动台架测试。
+/* 0：只调遥测，关闭四路电机 PWM 和控制任务；1：启用电机控制。 */
+#define RC_MOTOR_OUTPUT_ENABLED 0
+#if RC_MOTOR_OUTPUT_ENABLED != 0 && RC_MOTOR_OUTPUT_ENABLED != 1
+#error RC_MOTOR_OUTPUT_ENABLED must be 0 or 1
+#endif
+
+/* 电机控制启用时，0：使用自动台架测试。
  * 注意：无需遥控器，上电等待后会自行启动电机；只用于固定测试架。
- * 1：恢复正常接收机控制、手势解锁和失联检测。
- * 
- * #define RC_RECEIVER_ENABLED    0之后进入调试模式，若要恢复正常遥控器控制，改为 1 并重新编译烧录。
+ * 1：使用接收机控制、手势解锁和失联检测。
  */
 #ifndef RC_RECEIVER_ENABLED
 #define RC_RECEIVER_ENABLED    0
