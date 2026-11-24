@@ -59,7 +59,7 @@ flowchart TD
 | 姿态与数学 | [Firmware/Algorithms/Attitude.c](Firmware/Algorithms/Attitude.c)、[Firmware/Algorithms/Quaternion.c](Firmware/Algorithms/Quaternion.c) | 四元数融合、坐标变换与欧拉角换算 |
 | 采集与共享数据 | [Firmware/Services/ReadPeripherals.c](Firmware/Services/ReadPeripherals.c) | 校准、采样、解算、发布控制反馈和遥测快照 |
 | 硬件驱动 | `GY86`、`MyI2C`、`Receive_IC`、`BLDC`、`UART_Set` | GPIO、I2C、定时器和串口访问 |
-| 平台 | `Drivers/`、`Source/`、`Port/`、`ucCPU/`、`ucLib/` | HAL、CMSIS、RTOS 内核与 Cortex-M4 移植 |
+| 平台 | `Drivers/`、`Source/`、`Port/` | HAL、CMSIS、RTOS 内核与 Cortex-M4 移植 |
 
 控制算法不直接读写 HAL 外设。`FC_Control_Update()` 接收遥控和传感器快照，结果存入 `s_flight_control.rc.motor_us[0..3]`；控制任务统一调用 `BLDC_SetThrottle_us()` 写入四路电调。
 
@@ -79,7 +79,6 @@ Quadcopter_2/
 ├── Drivers/                 STM32 HAL、CMSIS、设备启动文件
 ├── Source/                  uC/OS-II 内核
 ├── Port/                    Cortex-M4 上下文切换与 SysTick 移植
-├── ucCPU/、ucLib/           Micrium 基础组件
 ├── SEGGER/                  RTT、SystemView 与 uC/OS-II 跟踪适配
 ├── PCB/                     PCB 工程、电调接口说明
 ├── Docs/                    控制、姿态、硬件、通信及调试文档
