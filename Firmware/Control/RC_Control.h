@@ -54,6 +54,7 @@ typedef struct {
 } RC_Control_t;
 
 /* 纯计算模块，不访问 HAL/RTOS。调用方串行调用并提供一致的接收机快照。 */
+
 uint8_t RC_Decode(const RC_Input_t *input, uint32_t now_ms, RC_Command_t *command);
 void RC_MakeSetpoint(const RC_Command_t *command, RC_Setpoint_t *setpoint);
 
@@ -61,6 +62,7 @@ void RC_MakeSetpoint(const RC_Command_t *command, RC_Setpoint_t *setpoint);
  * 对角同向旋转是偏航混控成立的前提。饱和时同比缩放差速，再平移公共油门。
  * FlightControl 使用 PID 输出调用此函数；调用方负责解锁、失联及回中停机。
  */
+
 void RC_Mix(float throttle_us, float roll_us, float pitch_us, float yaw_us,
             uint16_t motor_us[RC_MOTOR_COUNT]);
 void RC_Control_Init(RC_Control_t *control);
@@ -73,6 +75,7 @@ void RC_Control_Disarm(RC_Control_t *control);
  * 回中油门 + 偏航右打满保持 1s 解锁；回中油门 + 偏航左打满保持 1s 上锁。
  * 解锁手势还要求横滚/俯仰居中；任一通道无效或超时立即上锁。
  */
+
 void RC_Control_Update(RC_Control_t *control, const RC_Input_t *input, uint32_t now_ms);
 
 #endif

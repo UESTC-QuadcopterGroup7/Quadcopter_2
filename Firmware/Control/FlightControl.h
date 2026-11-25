@@ -51,6 +51,7 @@ typedef struct {
 } FC_Control_t;
 
 /* 校验原始陀螺未接近量程饱和，转换为与混控一致的三轴正方向。 */
+
 uint8_t FC_ConvertGyro(const int16_t gyro[FC_AXIS_COUNT], float rate_dps[FC_AXIS_COUNT]);
 uint8_t FC_Control_Init(FC_Control_t *control, uint32_t cycle_clock_hz);
 
@@ -62,6 +63,7 @@ uint8_t FC_Control_Init(FC_Control_t *control, uint32_t cycle_clock_hz);
  * 总倾角达到停机阈值时锁存故障。扶正至解锁倾角内，油门为零、横滚/俯仰
  * 居中、偏航左满持续 FC_TIPOVER_CLEAR_HOLD_MS 才解除；之后仍须手势解锁。
  */
+
 void FC_Control_Update(FC_Control_t *control, const RC_Input_t *input,
                        const FC_Feedback_t *feedback, uint32_t now_ms);
 

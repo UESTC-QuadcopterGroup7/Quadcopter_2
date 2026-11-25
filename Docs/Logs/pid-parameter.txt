@@ -1,0 +1,15 @@
+float rollShellKp = 4.4f; //外环Kp
+float rollCoreKp = 2.6f; //内环Kp
+float rollCoreTi = 0.5f; //内环Ti
+float rollCoreTd = 0.08f; //内环Td
+
+float pitchShellKp = 4.4f;
+float pitchCoreKp = 2.6f;
+float pitchCoreTi = 0.5f;
+float pitchCoreTd = 0.08f;
+
+float yawCoreKp = 2.6f;
+float yawCoreTd = 0.08f;
+
+float thrShellKp = 1.0f;
+float thrShellTd = 0.0f;

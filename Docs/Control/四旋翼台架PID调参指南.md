@@ -8,8 +8,8 @@
 
 | 轴 | 角度外环 P | 角速度 Kp | 角速度 Ki | 角速度 Kd |
 | --- | --- | --- | --- | --- |
-| 横滚 Roll | `FC_ROLL_ANGLE_KP` = `4.0` | `FC_ROLL_RATE_KP` = `0.88` | `FC_ROLL_RATE_KI` = `0.25` | `FC_ROLL_RATE_KD` = `0.005` |
-| 俯仰 Pitch | `FC_PITCH_ANGLE_KP` = `4.0` | `FC_PITCH_RATE_KP` = `0.88` | `FC_PITCH_RATE_KI` = `0.25` | `FC_PITCH_RATE_KD` = `0.005` |
+| 横滚 Roll | `FC_ROLL_ANGLE_KP` = `4.0` | `FC_ROLL_RATE_KP` = `1.50` | `FC_ROLL_RATE_KI` = `0.25` | `FC_ROLL_RATE_KD` = `0.005` |
+| 俯仰 Pitch | `FC_PITCH_ANGLE_KP` = `4.0` | `FC_PITCH_RATE_KP` = `1.50` | `FC_PITCH_RATE_KI` = `0.25` | `FC_PITCH_RATE_KD` = `0.005` |
 | 偏航 Yaw | 无 | `FC_YAW_RATE_KP` = `1.00` | `FC_YAW_RATE_KI` = `0.20` | `FC_YAW_RATE_KD` = `0.00` |
 
 表中是仓库当前的起始值。参数在 `Firmware/Control/FlightControlConfig.h`，修改后需要重新编译并烧录，再重复同一轮测试。[FlightControlConfig.h](../../Firmware/Control/FlightControlConfig.h)
@@ -21,7 +21,7 @@
 | 轴与参数 | 数量级 | 当前初值 | 台架微调参考范围 | 单次步长（按初值的 5%～10% 换算） |
 | --- | --- | --- | --- | --- |
 | 横滚、俯仰 `ANGLE_KP` | `10^0`，个位数 | `4.0` | `3.0–5.0` | `0.20–0.40` |
-| 横滚、俯仰 `RATE_KP` | `10^0`，接近 `1` | `0.88` | `0.66–1.10` | `0.044–0.088` |
+| 横滚、俯仰 `RATE_KP` | `10^0`，个位数 | `1.50` | `1.13–1.88` | `0.075–0.15` |
 | 横滚、俯仰 `RATE_KI` | `10^-1`，十分位 | `0.25` | `0.19–0.31` | `0.0125–0.025` |
 | 横滚、俯仰 `RATE_KD` | `10^-3`，千分之几 | `0.005` | `0.00375–0.00625` | `0.00025–0.00050` |
 | 偏航 `RATE_KP` | `10^0`，接近 `1` | `1.00` | `0.75–1.25` | `0.05–0.10` |
