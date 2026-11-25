@@ -108,6 +108,8 @@ main
 
 调匿名上位机时，在 [RC_Config.h](Firmware/Control/RC_Config.h) 将 `RC_MOTOR_OUTPUT_ENABLED` 设为 `0`，重新编译烧录。此时启动传感器和通信任务，通过 USART1（115200）发送姿态和传感器遥测，四路电机 PWM 保持关闭。`0xF1` 电机控制诊断帧随控制任务关闭。结束遥测调试后，设为 `1` 并重新编译烧录即可恢复电机控制。
 
+首次用 SWD 安装引导程序后，可以通过 HC‑05 串口更新固件。初装、构建和上传步骤见 [HC‑05 固件更新](Docs/Communication/HC05固件更新.md)。
+
 <a id="drivers"></a>
 
 ## 2. 硬件驱动设计

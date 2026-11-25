@@ -12,6 +12,27 @@
 
 #define FC_CONTROL_ENABLED (ACCEL_CAL_MODE == 0 && RC_MOTOR_OUTPUT_ENABLED)
 
+#ifdef QBT_APP
+#include "BluetoothBoot.h"
+#endif
+
+#if defined(QBT_APP) && !RC_MOTOR_OUTPUT_ENABLED
+static volatile uint8_t s_boot_requested;
+
+void USART1_IRQHandler(void)
+{
+    static uint8_t matched;
+    uint32_t status = USART1->SR;
+    uint8_t byte = (uint8_t)USART1->DR;
+
+    if ((status & (USART_SR_ORE | USART_SR_FE | USART_SR_NE)) != 0u) {
+        matched = 0u;
+    } else if ((status & USART_SR_RXNE) != 0u && QBT_MatchWake(byte, &matched)) {
+        s_boot_requested = 1u;
+    }
+}
+#endif
+
 #if RC_MOTOR_MIN_US != BLDC_MIN_US || RC_MOTOR_MAX_US != BLDC_MAX_US || \
     RC_MOTOR_OFF_US != BLDC_OFF_US
 #error RC mixer and BLDC pulse ranges must match
@@ -80,6 +101,11 @@ int main(void)
 {
     INT8U err;
 
+#ifdef QBT_APP
+    SCB->VTOR = QBT_APP_BASE;
+    __DSB();
+    __ISB();
+#endif
     HAL_Init();
     SystemClock_Config();
 
@@ -108,6 +134,11 @@ static void BSP_Init(void)
 #endif
     ReadPeripherals_Init();
     UART1_FULL_INIT(115200); // must 115200 baudrate
+#if defined(QBT_APP) && !RC_MOTOR_OUTPUT_ENABLED
+    NVIC_SetPriority(USART1_IRQn, 5u);
+    USART1->CR1 |= USART_CR1_RXNEIE;
+    NVIC_EnableIRQ(USART1_IRQn);
+#endif
 }
 
 static void AppTaskStart(void *p_arg)
@@ -251,6 +282,13 @@ static void APPTaskCom(void *p_arg)
     (void)p_arg;
 
     while (1) {
+#if defined(QBT_APP) && !RC_MOTOR_OUTPUT_ENABLED
+        if (s_boot_requested != 0u) {
+            QBT_EnableBackupWrite();
+            RTC->BKP0R = QBT_REQUEST;
+            NVIC_SystemReset();
+        }
+#endif
         ReadPeripherals_Transmit();
 #if FC_CONTROL_ENABLED
         if ((uint32_t)(HAL_GetTick() - diagnostics_last_ms) >= 200u) {

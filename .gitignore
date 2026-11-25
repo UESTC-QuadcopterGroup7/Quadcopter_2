@@ -1,6 +1,11 @@
 # Keil/MDK build outputs
 /Objects/**
 /Listings/**
+/Bluetooth*.uvprojx
+/Bluetooth*.uvoptx
+/Bluetooth*.uvguix.*
+/DebugConfig/Bluetooth*.dbgconf
+/Firmware/Bootloader/BootKey.local.h
 
 
 # Build artifacts
